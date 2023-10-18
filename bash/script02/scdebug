@@ -1,21 +1,15 @@
 #!/bin/bash
 
 TRACE_ID=$(uuidgen)
-OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
-OUTPUT_DIR="$HOME/.scdebug/$PROGRAM/"
 PROGRAM=""
+PROGRAM_ARGS=""
 STRACE_ARGS="0"
 STRACE_ARG_LIST=""
+ATTACH="0"
 
 # Funciones
 usage() {
   echo "scdebug.sh [-sto arg] [prog [arg1 ...]]"
-}
-
-dir_check() {
-  if [ ! -d $OUPUT_DIR ]; then
-    mkdir -p $OUPUT_DIR
-  fi
 }
 
 arg_check() {
@@ -30,26 +24,32 @@ arg_check() {
         fi
         STRACE_ARG_LIST="$1"
         ;;
+      -nattch )
+        ATTACH="1"
+        ;;
+      -* )
+        usage
+        exit 1
+        ;;
       * )
         if [ -n "$PROGRAM" ]; then
-          PROGRAM+=" "
+          PROGRAM_ARGS+=" $1"
+        else
+          PROGRAM+="$1"
         fi
-        PROGRAM+="$1"
         ;;
     esac
     shift
   done
 }
 # Programa principal
-dir_check
 arg_check "$@"
 
 OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
+OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
 
-cat << _EOF_
-  # $STRACE_ARG_LIST
-  # $OUTPUT_FILE
-  $PROGRAM
-_EOF_
+# cat << _EOF_
+#   $PROGRAM
+# _EOF_
 
-strace $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM
+mkdir -p $OUTPUT_DIR && strace $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM $PROGRAM_ARGS
