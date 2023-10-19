@@ -5,11 +5,13 @@ PROGRAM=""
 PROGRAM_ARGS=""
 STRACE_ARGS="0"
 STRACE_ARG_LIST=""
-ATTACH="0"
+ATTACH=""
+LAST_PID=""
 
 # Funciones
 usage() {
-  echo "scdebug.sh [-sto arg] [prog [arg1 ...]]"
+  echo "scdebug.sh [-sto arg] [[prog [arg1 ...]]
+  --help o -h para más información"
 }
 
 arg_check() {
@@ -22,14 +24,21 @@ arg_check() {
           usage
           exit 1
         fi
-        STRACE_ARG_LIST="$1"
+        STRACE_ARG_LIST="$1 "
         ;;
       -nattch )
         ATTACH="1"
+        shift
+        PROGRAM="$1"
+        last_pid     
         ;;
-      -* )
-        usage
-        exit 1
+      --help )
+        help
+        exit 0
+        ;;
+      -h )
+        help
+        exit 0
         ;;
       * )
         if [ -n "$PROGRAM" ]; then
@@ -42,14 +51,37 @@ arg_check() {
     shift
   done
 }
+
+help() {
+  echo "Este programa permite hacer la traza de las llamadas al sistema de cierto proceso
+  pasado por línea de comandos, esta traza se guarda en un archivo y se envía a la carpeta
+  ~/.scdebug/[comando introducido]/
+  
+  -sto [args]: se envían argumentos al comando strace que se ocupa de la traza
+  
+  -nattch [command]: se ejecuta un comando y se hace el strace con modo attach de este"
+}
+
+last_pid() {
+  LAST_PID=($(pgrep -n "$PROGRAM"))
+  STRACE_ARG_LIST+="-p $LAST_PID"
+  if [ -z $LAST_PID ]; then
+    echo "No hay ningún proceso abierto con ese nombre"
+    exit 1
+  fi  
+}
+
 # Programa principal
 arg_check "$@"
 
 OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
 OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
 
-# cat << _EOF_
-#   $PROGRAM
-# _EOF_
-
-mkdir -p $OUTPUT_DIR && strace $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM $PROGRAM_ARGS
+if [ -n "$ATTACH" ]; then
+  mkdir -p $OUTPUT_DIR && strace $STRACE_ARG_LIST -p $LAST_PID -o $OUTPUT_FILE
+  exit 0
+else
+  echo $STRACE_ARG_LIST
+  mkdir -p $OUTPUT_DIR && strace $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM $PROGRAM_ARGS
+  exit 0
+fi
