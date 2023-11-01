@@ -1,0 +1,141 @@
+#!/bin/bash
+
+TRACE_ID=$(uuidgen)
+PROGRAM=""
+PROGRAM_ARGS=""
+STRACE_ARGS="0"
+STRACE_ARG_LIST=""
+ATTACH=""
+LAST_PID=""
+TRACER_PID=""
+TRACEE_PID=""
+KILL_TRACES=""
+ATTACH_PROGRAMS=()
+
+# Funciones
+usage() {
+  echo "scdebug.sh [-sto arg] [[prog [arg1 ...]]
+  --help o -h para más información"
+}
+
+arg_check() {
+  while [ -n "$1" ]; do
+    case "$1" in
+      -sto )
+        STRACE_ARGS="1"
+        shift
+        if [ -z "$1" ]; then
+          usage
+          exit 1
+        fi
+        STRACE_ARG_LIST="$1 "
+        ;;
+      -nattch )
+        ATTACH="1"
+        get_natch_programs "$@"
+        ;;
+      -k)
+        KILL_TRACES="1"
+        shift
+        kill_traces 2> /dev/null
+        exit 0
+        ;;
+      --help )
+        help
+        exit 0
+        ;;
+      -h )
+        help
+        exit 0
+        ;;
+      * )
+        if [ -n "$PROGRAM" ]; then
+          PROGRAM_ARGS+=" $1"
+        else
+          PROGRAM+="$1"
+        fi
+        shift
+        ;;
+    esac
+    shift
+  done
+}
+
+help() {
+  echo "Este programa permite hacer la traza de las llamadas al sistema de cierto proceso
+  pasado por línea de comandos, esta traza se guarda en un archivo y se envía a la carpeta
+  ~/.scdebug/[comando introducido]/
+  
+  -sto [args]: se envían argumentos al comando strace que se ocupa de la traza
+  
+  -nattch [command]: se ejecuta un comando y se hace el strace con modo attach de este"
+}
+
+last_pid() {
+  LAST_PID=($(pgrep -n "$PROGRAM"))
+  STRACE_ARG_LIST+="-p $LAST_PID"
+  if [ -z $LAST_PID ]; then
+    echo "No hay ningún proceso abierto con ese nombre"
+    exit 1
+  fi  
+}
+
+tracer_and_tracee_pid() {
+  TRACEE_PID=$(pgrep -n "$PROGRAM")
+  TRACER_PID=$(cat /proc/$TRACEE_PID/status | grep "TracerPid" | cut -f 2)
+}
+
+kill_traces() {
+  for i in $(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2); do
+    if [ "$(cat /proc/$i/status | grep "TracerPid" | cut -f 2)" != "0" ]; then
+      kill -9 $(cat /proc/$i/status | grep "TracerPid" | cut -f 2)
+      kill -9 $i
+    fi
+  done
+}
+
+get_natch_programs() {
+  shift
+  case "$1" in
+    -*)
+      arg_check "$@"
+      ;;
+    *)
+      ATTACH_PROGRAMS+=("$1")
+      shift
+      get_natch_programs "$@"
+      ;;
+  esac
+}
+
+nattch_option () {
+  for i in $ATTACH_PROGRAMS; do
+    PID=$(pgrep -n "$i")
+    OUTPUT_FILE="$HOME/.scdebug/$i/trace_$TRACE_ID.txt"
+    OUTPUT_DIR="$HOME/.scdebug/$i"
+    mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -p $PID -o $OUTPUT_FILE& 2> /dev/null)
+    TRACER_PID=$(cat /proc/$PID/status | grep "TracerPid" | cut -f 2)
+    echo "PID del tracer: $TRACER_PID"
+    echo "PID del tracee: $PID"
+    echo
+    ps -u $USER | tr -s " " | cut -d " " -f 2,5 2> /dev/null
+  done
+  exit 0
+}
+
+# Programa principal
+arg_check "$@"
+
+if [ -n "$ATTACH" ]; then
+  nattch_option 2> /dev/null
+else
+  OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
+  mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -p $LAST_PID -o $OUTPUT_FILE& 2> /dev/null)
+  tracer_and_tracee_pid
+  echo "PID del tracer: $TRACER_PID"
+  echo "PID del tracee: $TRACEE_PID"
+  echo
+  ps -u $USER | tr -s " " | cut -d " " -f 2,5 2> /dev/null
+  exit 0
+fi
