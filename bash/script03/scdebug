@@ -12,6 +12,7 @@ TRACER_PID=""
 TRACEE_PID=""
 KILL_TRACES=""
 ATTACH_PROGRAM=""
+PATTCH_PID=""
 
 # Funciones
 usage() {
@@ -33,9 +34,11 @@ arg_check() {
         ;;
       -nattch )
         ATTACH="1"
+        PATTCH=""
         ;;
       -pattch )
         PATTCH="1"
+        ATTACH=""
         ;;
       -k)
         KILL_TRACES="1"
@@ -55,6 +58,10 @@ arg_check() {
         if [ -n "$ATTACH" ]; then
           ATTACH_PROGRAM="$1"
           nattch_option
+        fi
+        if [ -n "$PATTCH" ]; then
+          PATTCH_PID="$1"
+          pattch_option
         fi
         if [ -n "$PROGRAM" ]; then
           PROGRAM_ARGS+=" $1"
@@ -101,7 +108,7 @@ kill_traces() {
 }
 
 nattch_option () {
-  echo "Programa a ejecutar: $ATTACH_PROGRAM"
+  echo "Programa a monitorizar: $ATTACH_PROGRAM"
   PID=$(pgrep -n "$ATTACH_PROGRAM")
   OUTPUT_FILE="$HOME/.scdebug/$ATTACH_PROGRAM/trace_$TRACE_ID.txt"
   OUTPUT_DIR="$HOME/.scdebug/$ATTACH_PROGRAM"
@@ -113,10 +120,23 @@ nattch_option () {
   echo
 }
 
+pattch_option() {
+  PATTCH_PROGRAM="$(ps -p $PATTCH_PID --no-header | tr -s " " | cut -d " " -f 5)"
+  echo "Programa a monitorizar: $PATTCH_PROGRAM"
+  OUTPUT_FILE="$HOME/.scdebug/$PATTCH_PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$PATTCH_PROGRAM"
+  mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -p $PATTCH_PID -o $OUTPUT_FILE& 2> /dev/null)
+  ps -u $USER | tr -s " " | cut -d " " -f 2,5 2> /dev/null
+  TRACER_PID=$(cat /proc/$PATTCH_PID/status | grep "TracerPid" | cut -f 2)
+  echo "PID del tracer: $TRACER_PID"
+  echo "PID del tracee: $PATTCH_PID"
+  echo
+}
+
 # Programa principal
 arg_check "$@"
 
-if [ -n "$ATTACH" ]; then
+if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
   exit 0
 else
   OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
