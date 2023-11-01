@@ -7,7 +7,6 @@ STRACE_ARGS="0"
 STRACE_ARG_LIST=""
 ATTACH=""
 PATTCH=""
-LAST_PID=""
 TRACER_PID=""
 TRACEE_PID=""
 KILL_TRACES=""
@@ -17,7 +16,7 @@ PATTCH_PID=""
 # Funciones
 usage() {
   echo "scdebug [-h] [-sto arg] [-v | -vall] [-k] [prog [arg …] ] [-nattch progtoattach …] [-pattch pid1 … ]
-  --help o -h para más información"
+--help o -h para más información"
 }
 
 arg_check() {
@@ -25,12 +24,6 @@ arg_check() {
     case "$1" in
       -sto )
         STRACE_ARGS="1"
-        shift
-        if [ -z "$1" ]; then
-          usage
-          exit 1
-        fi
-        STRACE_ARG_LIST="$1 "
         ;;
       -nattch )
         ATTACH="1"
@@ -54,19 +47,32 @@ arg_check() {
         help
         exit 0
         ;;
-      * )
-        if [ -n "$ATTACH" ]; then
-          ATTACH_PROGRAM="$1"
-          nattch_option
+      -* )
+        if [ "$STRACE_ARGS" = "1" ]; then
+          STRACE_ARG_LIST+="$1 "
+        else 
+          if [ -n "$PROGRAM" ]; then
+            PROGRAM_ARGS+=" $1"
+          else 
+            echo "Argumento $1 no válido"
+            usage
+            exit 1           
+          fi
         fi
+        ;;
+      * )
         if [ -n "$PATTCH" ]; then
           PATTCH_PID="$1"
           pattch_option
         fi
+        if [ -n "$ATTACH" ]; then
+          ATTACH_PROGRAM="$1"
+          nattch_option
+        fi
         if [ -n "$PROGRAM" ]; then
           PROGRAM_ARGS+=" $1"
         else
-          PROGRAM+="$1"
+          PROGRAM="$1"
         fi
         ;;
     esac
@@ -80,22 +86,17 @@ help() {
   ~/.scdebug/[comando introducido]/
   
   -sto [args]: se envían argumentos al comando strace que se ocupa de la traza
-  
-  -nattch [command]: se ejecuta un comando y se hace el strace con modo attach de este"
-}
 
-last_pid() {
-  LAST_PID=($(pgrep -n "$PROGRAM"))
-  STRACE_ARG_LIST+="-p $LAST_PID"
-  if [ -z $LAST_PID ]; then
-    echo "No hay ningún proceso abierto con ese nombre"
-    exit 1
-  fi  
+  -k: se matan todos los procesos de traza que estén corriendo junto con los trazados
+  
+  -nattch [command ... ]: se hace strace con attach a el último proceso de cada uno de los que se pasen por argumento
+
+  -pattch [PID ...]: se hace strace con attach a cada uno de los PID pasados por argumento"
 }
 
 tracer_and_tracee_pid() {
   TRACEE_PID=$(pgrep -n "$PROGRAM")
-  TRACER_PID=$(cat /proc/$TRACEE_PID/status | grep "TracerPid" | cut -f 2)
+  TRACER_PID=$(cat 2> /dev/null /proc/$TRACEE_PID/status | grep "TracerPid" | cut -f 2)
 }
 
 kill_traces() {
@@ -108,8 +109,12 @@ kill_traces() {
 }
 
 nattch_option () {
-  echo "Programa a monitorizar: $ATTACH_PROGRAM"
   PID=$(pgrep -n "$ATTACH_PROGRAM")
+  if [ -z $PID ]; then
+    echo "No hay ningún proceso abierto con el nombre $ATTACH_PROGRAM"
+    exit 2
+  fi
+  echo "Programa a monitorizar: $ATTACH_PROGRAM"
   OUTPUT_FILE="$HOME/.scdebug/$ATTACH_PROGRAM/trace_$TRACE_ID.txt"
   OUTPUT_DIR="$HOME/.scdebug/$ATTACH_PROGRAM"
   mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -p $PID -o $OUTPUT_FILE& 2> /dev/null)
@@ -122,6 +127,10 @@ nattch_option () {
 
 pattch_option() {
   PATTCH_PROGRAM="$(ps -p $PATTCH_PID --no-header | tr -s " " | cut -d " " -f 5)"
+  if [ -z $PATTCH_PROGRAM ]; then
+    echo "No hay ningún proceso abierto con el PID $PATTCH_PID"
+    exit 2
+  fi
   echo "Programa a monitorizar: $PATTCH_PROGRAM"
   OUTPUT_FILE="$HOME/.scdebug/$PATTCH_PROGRAM/trace_$TRACE_ID.txt"
   OUTPUT_DIR="$HOME/.scdebug/$PATTCH_PROGRAM"
@@ -133,19 +142,23 @@ pattch_option() {
   echo
 }
 
+normal_strace() {
+  OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
+  mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM $PROGRAM_ARGS)
+  tracer_and_tracee_pid
+  echo "PID del tracer: $$"
+  echo "PID del tracee: $TRACEE_PID"
+  echo
+  ps -u $USER 2> /dev/null | tr -s " " | cut -d " " -f 2,5
+  exit 0
+}
+
 # Programa principal
 arg_check "$@"
 
 if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
   exit 0
 else
-  OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
-  OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
-  mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -p $LAST_PID -o $OUTPUT_FILE& 2> /dev/null)
-  tracer_and_tracee_pid
-  echo "PID del tracer: $TRACER_PID"
-  echo "PID del tracee: $TRACEE_PID"
-  echo
-  ps -u $USER | tr -s " " | cut -d " " -f 2,5 2> /dev/null
-  exit 0
+  normal_strace& 2> /dev/null
 fi
