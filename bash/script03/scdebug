@@ -6,15 +6,16 @@ PROGRAM_ARGS=""
 STRACE_ARGS="0"
 STRACE_ARG_LIST=""
 ATTACH=""
+PATTCH=""
 LAST_PID=""
 TRACER_PID=""
 TRACEE_PID=""
 KILL_TRACES=""
-ATTACH_PROGRAMS=()
+ATTACH_PROGRAM=""
 
 # Funciones
 usage() {
-  echo "scdebug.sh [-sto arg] [[prog [arg1 ...]]
+  echo "scdebug [-h] [-sto arg] [-v | -vall] [-k] [prog [arg …] ] [-nattch progtoattach …] [-pattch pid1 … ]
   --help o -h para más información"
 }
 
@@ -32,7 +33,9 @@ arg_check() {
         ;;
       -nattch )
         ATTACH="1"
-        get_natch_programs "$@"
+        ;;
+      -pattch )
+        PATTCH="1"
         ;;
       -k)
         KILL_TRACES="1"
@@ -49,12 +52,15 @@ arg_check() {
         exit 0
         ;;
       * )
+        if [ -n "$ATTACH" ]; then
+          ATTACH_PROGRAM="$1"
+          nattch_option
+        fi
         if [ -n "$PROGRAM" ]; then
           PROGRAM_ARGS+=" $1"
         else
           PROGRAM+="$1"
         fi
-        shift
         ;;
     esac
     shift
@@ -94,40 +100,24 @@ kill_traces() {
   done
 }
 
-get_natch_programs() {
-  shift
-  case "$1" in
-    -*)
-      arg_check "$@"
-      ;;
-    *)
-      ATTACH_PROGRAMS+=("$1")
-      shift
-      get_natch_programs "$@"
-      ;;
-  esac
-}
-
 nattch_option () {
-  for i in $ATTACH_PROGRAMS; do
-    PID=$(pgrep -n "$i")
-    OUTPUT_FILE="$HOME/.scdebug/$i/trace_$TRACE_ID.txt"
-    OUTPUT_DIR="$HOME/.scdebug/$i"
-    mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -p $PID -o $OUTPUT_FILE& 2> /dev/null)
-    TRACER_PID=$(cat /proc/$PID/status | grep "TracerPid" | cut -f 2)
-    echo "PID del tracer: $TRACER_PID"
-    echo "PID del tracee: $PID"
-    echo
-    ps -u $USER | tr -s " " | cut -d " " -f 2,5 2> /dev/null
-  done
-  exit 0
+  echo "Programa a ejecutar: $ATTACH_PROGRAM"
+  PID=$(pgrep -n "$ATTACH_PROGRAM")
+  OUTPUT_FILE="$HOME/.scdebug/$ATTACH_PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$ATTACH_PROGRAM"
+  mkdir -p $OUTPUT_DIR && (strace 2> /dev/null $STRACE_ARG_LIST -p $PID -o $OUTPUT_FILE& 2> /dev/null)
+  ps -u $USER | tr -s " " | cut -d " " -f 2,5 2> /dev/null  
+  TRACER_PID=$(cat /proc/$PID/status | grep "TracerPid" | cut -f 2)
+  echo "PID del tracer: $TRACER_PID"
+  echo "PID del tracee: $PID"
+  echo
 }
 
 # Programa principal
 arg_check "$@"
 
 if [ -n "$ATTACH" ]; then
-  nattch_option 2> /dev/null
+  exit 0
 else
   OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
   OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
