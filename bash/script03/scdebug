@@ -143,7 +143,9 @@ normal_strace() {
   OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
   mkdir 2> /dev/null -p $OUTPUT_DIR 
   strace 2>&1 $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM $PROGRAM_ARGS || STRACE_ERROR="$?"
+  echo "PID del programa: $(pgrep -n $PROGRAM)"
   if [ -n "$STRACE_ERROR" ]; then
+    echo strace error: $STRACE_ERROR
     echo "No se pudo monitorizar el programa $PROGRAM, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
     exit 4
   fi
@@ -151,6 +153,9 @@ normal_strace() {
 }
 
 tracer_and_tracee_pid() {
+  sleep 0.1
+  echo "Procesos y sus trazadores"
+  echo "=========================="
   LISTA_PROCESOS="$(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2)"
   for i in $LISTA_PROCESOS; do
     echo "NOMBRE: $(ps 2>/dev/null -p $i --no-header | tr -s " " | cut -d " " -f 5)"
@@ -160,6 +165,7 @@ tracer_and_tracee_pid() {
     echo "TracerID: $(ps 2>/dev/null -p $TRACER_PID --no-header | tr -s " " | cut -d " " -f 5)"
     echo
   done
+  echo "=========================="
 }
 
 # Programa principal
@@ -167,9 +173,7 @@ arg_check "$@"
 
 if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
   sleep 0.1
-  if [ -z "$STRACE_ERROR" ]; then
-    tracer_and_tracee_pid
-  fi
+  tracer_and_tracee_pid
   exit 0
 else
   if [ -z "$PROGRAM" ]; then
@@ -178,8 +182,5 @@ else
     exit 3
   fi
   normal_strace&
+  tracer_and_tracee_pid
 fi
-
-sleep 0.1
-
-tracer_and_tracee_pid
