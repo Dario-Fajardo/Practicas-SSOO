@@ -1,0 +1,196 @@
+#!/bin/bash
+
+TRACE_ID=$(uuidgen)
+PROGRAM=""
+PROGRAM_ARGS=""
+STRACE_ARGS="0"
+STRACE_ARG_LIST=""
+ATTACH=""
+PATTCH=""
+TRACER_PID=""
+KILL_TRACES=""
+ATTACH_PROGRAM=""
+PATTCH_PID=""
+STRACE_ERROR=""
+PROCESS_LIST=""
+SCDEBUG_DIRS=""
+
+# Funciones
+usage() {
+  echo "scdebug [-h] [-sto arg] [-k] [prog [arg …] ] [-nattch progtoattach …] [-pattch pid1 … ]
+--help o -h para más información"
+}
+
+arg_check() {
+  while [ -n "$1" ]; do
+    case "$1" in
+      -sto )
+        STRACE_ARGS="1"
+        ;;
+      -nattch )
+        ATTACH="1"
+        PATTCH=""
+        ;;
+      -pattch )
+        PATTCH="1"
+        ATTACH=""
+        ;;
+      -k)
+        KILL_TRACES="1"
+        kill_traces 2> /dev/null
+        exit 0
+        ;;
+      --help )
+        help
+        exit 0
+        ;;
+      -h )
+        help
+        exit 0
+        ;;
+      -* )
+        if [ "$STRACE_ARGS" = "1" ] && [ -z $PROGRAM ]; then
+          STRACE_ARG_LIST+="$1 "
+        else 
+          if [ -n "$PROGRAM" ]; then
+            PROGRAM_ARGS+=" $1"
+          else 
+            echo "Argumento $1 no válido"
+            usage
+            exit 1           
+          fi
+        fi
+        ;;
+      * )
+        if [ -n "$PATTCH" ]; then
+          PATTCH_PID="$1"
+          pattch_option& 2> /dev/null
+        fi
+        if [ -n "$ATTACH" ]; then
+          ATTACH_PROGRAM="$1"
+          nattch_option& 2> /dev/null
+        fi
+        if [ -n "$PROGRAM" ]; then
+          PROGRAM_ARGS+=" $1"
+        else
+          PROGRAM="$1"
+        fi
+        ;;
+    esac
+    shift
+  done
+}
+
+help() {
+  echo "Este programa permite hacer la traza de las llamadas al sistema de cierto proceso
+  pasado por línea de comandos, esta traza se guarda en un archivo y se envía a la carpeta
+  ~/.scdebug/[comando introducido]/
+  
+  -sto [args]: se envían argumentos al comando strace que se ocupa de la traza
+
+  -k: se matan todos los procesos de traza que estén corriendo junto con los trazados
+  
+  -nattch [command ... ]: se hace strace con attach a el último proceso de cada uno de los que se pasen por argumento
+
+  -pattch [PID ...]: se hace strace con attach a cada uno de los PID pasados por argumento"
+}
+
+kill_traces() {
+  for i in $(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2); do
+    if [ "$(cat /proc/$i/status | grep "TracerPid" | cut -f 2)" != "0" ]; then
+      kill -9 $(cat /proc/$i/status | grep "TracerPid" | cut -f 2)
+      kill -9 $i
+    fi
+  done
+}
+
+nattch_option () {
+  PID=$(pgrep -n "$ATTACH_PROGRAM")
+  if [ -z $PID ]; then
+    echo "No hay ningún proceso abierto con el nombre $ATTACH_PROGRAM"
+    exit 2
+  fi
+  echo "Programa a monitorizar: $ATTACH_PROGRAM"
+  OUTPUT_FILE="$HOME/.scdebug/$ATTACH_PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$ATTACH_PROGRAM"
+  mkdir 2> /dev/null -p $OUTPUT_DIR 
+  (strace 2>&1 $STRACE_ARG_LIST -p $PID -o $OUTPUT_FILE) || STRACE_ERROR="$?"
+  if [ -n "$STRACE_ERROR" ]; then
+    echo "No se pudo monitorizar el programa $ATTACH_PROGRAM, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
+    exit 4
+  fi
+}
+
+pattch_option() {
+  PATTCH_PROGRAM="$(ps -p $PATTCH_PID --no-header | tr -s " " | cut -d " " -f 5)"
+  if [ -z $PATTCH_PROGRAM ]; then
+    echo "No hay ningún proceso abierto con el PID $PATTCH_PID"
+    exit 2
+  fi
+  echo "Programa a monitorizar: $PATTCH_PROGRAM"
+  OUTPUT_FILE="$HOME/.scdebug/$PATTCH_PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$PATTCH_PROGRAM"
+  mkdir 2>/dev/null -p $OUTPUT_DIR 
+  (strace 2> /dev/null $STRACE_ARG_LIST -p $PATTCH_PID -o $OUTPUT_FILE) || STRACE_ERROR="$?"
+  if [ -n "$STRACE_ERROR" ]; then
+    echo "No se pudo monitorizar el programa con el PID $PATTCH_PID, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
+    exit 4
+  fi
+}
+
+normal_strace() {
+  OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
+  mkdir 2> /dev/null -p $OUTPUT_DIR 
+  strace 2>&1 $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM $PROGRAM_ARGS || STRACE_ERROR="$?"
+  echo "PID del programa: $(pgrep -n $PROGRAM)"
+  if [ -n "$STRACE_ERROR" ]; then
+    echo strace error: $STRACE_ERROR
+    echo "No se pudo monitorizar el programa $PROGRAM, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
+    exit 4
+  fi
+  exit 0
+}
+
+tracer_and_tracee_pid() {
+  sleep 0.1
+  echo "Procesos y sus trazadores"
+  echo "=========================="
+  PROCESS_LIST="$(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2)"
+  for i in $PROCESS_LIST; do
+    echo "NOMBRE: $(ps 2>/dev/null -p $i --no-header | tr -s " " | cut -d " " -f 5)"
+    echo "PID: $i"
+    TRACER_PID=$(cat 2>/dev/null /proc/$i/status | grep "TracerPid" | cut -f 2)
+    echo "TracerPid: $TRACER_PID"
+    echo "TracerID: $(ps 2>/dev/null -p $TRACER_PID --no-header | tr -s " " | cut -d " " -f 5)"
+    echo
+  done
+  echo "=========================="
+}
+
+print_traces() {
+  echo "DIR         NUM           FICHERO_MAS_RECIENTE"
+  echo "==================================================="
+  SCDEBUG_DIRS=$(ls ~/.scdebug)
+  for i in $SCDEBUG_DIRS; do
+    echo "$i          $(ls ~/.scdebug/$i | wc -w)         $(ls -lt ~/.scdebug/ls/ | grep - | tr -s " " | cut -d " " -f6- | head -n 1)"
+  done
+}
+
+# Programa principal
+# tracer_and_tracee_pid
+print_traces
+arg_check "$@"
+
+if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
+  sleep 0.1
+  exit 0
+else
+  if [ -z "$PROGRAM" ]; then
+    echo "No se ha introducido ningún programa"
+    usage
+    exit 3
+  fi
+  normal_strace&
+fi
+sleep 0.1
