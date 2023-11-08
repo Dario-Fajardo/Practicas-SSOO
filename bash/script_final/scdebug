@@ -1,32 +1,31 @@
 #!./ptbash
 
-TRACE_ID=$(uuidgen)
-PROGRAM=""
-PROGRAM_ARGS=""
-STRACE_ARGS="0"
-STRACE_ARG_LIST=""
-ATTACH=""
-PATTCH=""
-TRACER_PID=""
-TRACEE_PID=""
-KILL_TRACES=""
-ATTACH_PROGRAM=""
-PATTCH_PID=""
-STRACE_ERROR=""
-LISTA_PROCESOS=""
-STOP=""
-STOP_ARGS=""
-ERROR=""
-OPTION_G=""
-OPTION_GE=""
-OPTION_GC=""
-RESUME_PIDS=""
-TABLE_INFO=""
-TABLE_LINE=""
-TABLE=""
-INV=""
+TRACE_ID=$(uuidgen) # Generamos un ID único para cada traza
+PROGRAM="" # Variable que almacena el programa a trazar
+PROGRAM_ARGS="" #Variable que almacena los argumentos del programa a trazar
+STRACE_ARGS="0" # Variable que confirma si se han introducido argumentos para strace
+STRACE_ARG_LIST="" # Variable que almacena los argumentos de strace
+ATTACH="" # Variable que confirma si se ha introducido la opción -nattch
+PATTCH="" # Variable que confirma si se ha introducido la opción -pattch
+TRACER_PID="" # Variable que almacena el PID del proceso que hace la traza
+TRACEE_PID="" # Variable que almacena el PID del proceso que es trazado
+KILL_TRACES="" # Variable que confirma si se ha introducido la opción -k
+ATTACH_PROGRAM="" # Variable que almacena el nombre del programa a trazar con -nattch
+PATTCH_PID="" # Variable que almacena el PID del programa a trazar con -pattch
+STRACE_ERROR="" # Variable que almacena el error de strace
+LISTA_PROCESOS="" # Variable que almacena la lista de procesos del usuario
+STOP="" # Variable que confirma si se ha introducido la opción -S
+STOP_ARGS="" # Variable que almacena los argumentos de la opción -S
+OPTION_G="" # Variable que confirma si se ha introducido la opción -g
+OPTION_GE="" # Variable que confirma si se ha introducido la opción -ge 
+OPTION_GC="" # Variable que confirma si se ha introducido la opción -gc
+RESUME_PIDS="" # Variable que almacena los PIDs de los procesos a reanudar
+TABLE_INFO="" # Variable que almacena la información de la tabla de -ge y -gc
+TABLE_LINE="" # Variable que almacena una línea de la tabla de -ge y -gc
+TABLE="" # Variable que almacena la tabla de -ge y -gc
+INV="" # Variable que confirma si se ha introducido la opción -inv para invertir la tabla de -ge y -gc
 
-# Funciones
+#################### Funciones ####################
 usage() {
   echo "scdebug [-h] [-sto arg] [-k] [prog [arg …] ] [-nattch progtoattach …] [-pattch pid1 … ]
 --help o -h para más información"
@@ -184,7 +183,6 @@ nattch_option () {
   PID=$(pgrep -n "$ATTACH_PROGRAM")
   if [ -z $PID ]; then
     echo "No hay ningún proceso abierto con el nombre $ATTACH_PROGRAM"
-    ERROR="1"
     exit 2
   fi
   echo "Programa a monitorizar: $ATTACH_PROGRAM"
@@ -193,7 +191,7 @@ nattch_option () {
   mkdir 2> /dev/null -p $OUTPUT_DIR 
   (strace 2>&1 $STRACE_ARG_LIST -p $PID -o $OUTPUT_FILE) || STRACE_ERROR="$?"
   if [ -n "$STRACE_ERROR" ]; then
-    echo "No se pudo monitorizar el programa $ATTACH_PROGRAM, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
+    echo "No se pudo monitorizar el programa $ATTACH_PROGRAM, strace falló con el error $STRACE_ERROR" | tee 2>/dev/null -a $OUTPUT_FILE
     exit 4
   fi
 }
@@ -202,7 +200,6 @@ pattch_option() {
   PATTCH_PROGRAM="$(ps -p $PATTCH_PID --no-header | tr -s " " | cut -d " " -f 5)"
   if [ -z $PATTCH_PROGRAM ]; then
     echo "No hay ningún proceso abierto con el PID $PATTCH_PID"
-    ERROR="1"
     exit 2
   fi
   echo "Programa a monitorizar: $PATTCH_PROGRAM"
@@ -211,8 +208,7 @@ pattch_option() {
   mkdir 2>/dev/null -p $OUTPUT_DIR 
   (strace 2> /dev/null $STRACE_ARG_LIST -p $PATTCH_PID -o $OUTPUT_FILE) || STRACE_ERROR="$?"
   if [ -n "$STRACE_ERROR" ]; then
-    echo "No se pudo monitorizar el programa con el PID $PATTCH_PID, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
-    ERROR="4"
+    echo "No se pudo monitorizar el programa con el PID $PATTCH_PID, strace falló con el error $STRACE_ERROR" | tee 2>/dev/null -a $OUTPUT_FILE
     exit 4
   fi
 }
@@ -225,8 +221,7 @@ normal_strace() {
   echo "PID del programa: $(pgrep -n $PROGRAM)"
   if [ -n "$STRACE_ERROR" ]; then
     echo strace error: $STRACE_ERROR
-    echo "No se pudo monitorizar el programa $PROGRAM, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
-    ERROR="4"
+    echo "No se pudo monitorizar el programa $PROGRAM, strace falló con el error $STRACE_ERROR" | tee 2>/dev/null -a $OUTPUT_FILE
     exit 4
   fi
   exit 0
@@ -234,22 +229,25 @@ normal_strace() {
 
 tracer_and_tracee_pid() {
   sleep 0.1
-  echo "=========================="
-  echo "Procesos y sus trazadores"
-  echo "=========================="
   LISTA_PROCESOS="$(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2)"
+  Tabla_procesos=""
   for i in $LISTA_PROCESOS; do
     NOMBRE=$(ps 2>/dev/null -p $i --no-header | tr -s " " | cut -d " " -f 5)
     if [ -n "$NOMBRE" ]; then
-      echo "NOMBRE: $NOMBRE"
-      echo "PID: $i"
       TRACER_PID=$(cat 2>/dev/null /proc/$i/status | grep "TracerPid" | cut -f 2)
-      echo "TracerPid: $TRACER_PID"
-      echo "TracerID: $(ps 2>/dev/null -p $TRACER_PID --no-header | tr -s " " | cut -d " " -f 5)"
-      echo
+      TracerID=$(ps 2>/dev/null -p $TRACER_PID --no-header | tr -s " " | cut -d " " -f 5)
+      if [ "$TRACER_PID" = "0" ]; then
+        TracerID="N/A"
+        TRACER_PID="N/A"
+      fi
+      Linea_tabla="$NOMBRE $i $TRACER_PID $TracerID"
+      Tabla_procesos+="$Linea_tabla
+"
     fi
   done
-  echo "=========================="
+  echo "========================================================="
+  echo "$Tabla_procesos" | sort -k 2 -nr | column -t --table-column Nombre,PID,TracerPID,TracerID
+  echo "========================================================="
 }
 
 stop() {
@@ -260,6 +258,7 @@ stop() {
 }
 
 resume_strace_g() {
+  TRACE_ID=$(uuidgen)
   mkdir -p "$HOME/.scdebug/$(ps -p $1 -o comm= | cut -d "_" -f 2)"
   strace -p $1 -o "$HOME/.scdebug/$(ps -p $1 -o comm= | cut -d "_" -f 2)/trace_$TRACE_ID.txt"&
   sleep 0.2
@@ -278,20 +277,24 @@ resume_strace_ge_gc() {
 "
 }
 
-# Programa principal
-arg_check "$@"
+#################### Main ####################
+arg_check "$@" # Llamamos a la función que comprueba las opciones del script
 
-if [ "$?" != "0" ]; then
+if [ "$?" != "0" ]; then # Vemos que nada haya fallado en la comprobación de argumentos
   exit $?
 fi
 
-if [ -n "$STOP" ]; then
+if [ -n "$STOP" ]; then # Si se ha introducido la opción -S
   stop
   exit $?
 fi
 
-if [ -n "$OPTION_G" ]; then
+if [ -n "$OPTION_G" ]; then # Si se ha introducido la opción -g
   RESUME_PIDS=$(ps | grep traced_ | tr -s " " | cut -d " " -f 2)
+  if [ -z "$RESUME_PIDS" ]; then
+    echo "No hay ningún proceso monitorizado"
+    exit 2
+  fi
   for pid in $RESUME_PIDS; do
     resume_strace_g "$pid"&
   done
@@ -299,7 +302,7 @@ if [ -n "$OPTION_G" ]; then
   exit $?
 fi
 
-if [ -n "$OPTION_GE" ]; then
+if [ -n "$OPTION_GE" ]; then # Si se ha introducido la opción -ge
   RESUME_PIDS=$(ps | grep traced_ | tr -s " " | cut -d " " -f 2)
   if [ -z "$RESUME_PIDS" ]; then
     echo "No hay ningún proceso monitorizado"
@@ -321,7 +324,7 @@ if [ -n "$OPTION_GE" ]; then
   exit $?
 fi
 
-if [ -n "$OPTION_GC" ]; then
+if [ -n "$OPTION_GC" ]; then # Si se ha introducido la opción -gc
   RESUME_PIDS=$(ps | grep traced_ | tr -s " " | cut -d " " -f 2)
   if [ -z "$RESUME_PIDS" ]; then
     echo "No hay ningún proceso monitorizado"
@@ -343,7 +346,7 @@ if [ -n "$OPTION_GC" ]; then
   exit $?
 fi
 
-if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
+if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then # Si se ha introducido la opción -nattch o -pattch
   if [ -n "$ATTACH" ]; then
     if [ -z "$ATTACH_PROGRAM" ]; then
       echo "No se ha introducido ningún programa"
@@ -351,7 +354,7 @@ if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
       exit 2
     fi
   fi
-  if [ -n "$PATTCH" ]; then
+  if [ -n "$PATTCH" ]; then 
     if [ -z $PATTCH_PID ]; then
       echo "No se ha introducido ningún PID"
       usage
@@ -361,12 +364,12 @@ if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
   sleep 0.1
   tracer_and_tracee_pid
   exit 0
-else
-  if [ -z "$PROGRAM" ]; then
+else # Si no se ha introducido ninguna opción que cambie el comportamiento del programa
+  if [ -z "$PROGRAM" ]; then # Si no se ha introducido ningún programa da error
     echo "No se ha introducido ningún programa"
     usage
     exit 3
   fi
   normal_strace&
-  <tracer_and_tracee_pid
+  tracer_and_tracee_pid
 fi
