@@ -1,0 +1,372 @@
+#!./ptbash
+
+TRACE_ID=$(uuidgen)
+PROGRAM=""
+PROGRAM_ARGS=""
+STRACE_ARGS="0"
+STRACE_ARG_LIST=""
+ATTACH=""
+PATTCH=""
+TRACER_PID=""
+TRACEE_PID=""
+KILL_TRACES=""
+ATTACH_PROGRAM=""
+PATTCH_PID=""
+STRACE_ERROR=""
+LISTA_PROCESOS=""
+STOP=""
+STOP_ARGS=""
+ERROR=""
+OPTION_G=""
+OPTION_GE=""
+OPTION_GC=""
+RESUME_PIDS=""
+TABLE_INFO=""
+TABLE_LINE=""
+TABLE=""
+INV=""
+
+# Funciones
+usage() {
+  echo "scdebug [-h] [-sto arg] [-k] [prog [arg …] ] [-nattch progtoattach …] [-pattch pid1 … ]
+--help o -h para más información"
+}
+
+arg_check() {
+  while [ -n "$1" ]; do
+    case "$1" in
+      -sto )
+        STRACE_ARGS="1"
+        ;;
+      -nattch )
+        for i in $@; do
+          if [ "$i" = "-S" ] || [ "$i" = "-g" ] || [ "$i" = "-ge" ] || [ "$i" = "-gc" ]; then
+            echo "No se puede usar alguna de las opciones introducidas con -nattch"
+            usage
+            exit 6
+          fi
+        done
+        ATTACH="1"
+        PATTCH=""
+        ;;
+      -pattch )
+        for i in $@; do
+          if [ "$i" = "-S" ] || [ "$i" = "-g" ] || [ "$i" = "-ge" ] || [ "$i" = "-gc" ]; then
+            echo "No se puede usar alguna de las opciones introducidas con -pattch"
+            usage
+            exit 6
+          fi
+        done
+        PATTCH="1"
+        ATTACH=""
+        ;;
+      -k)
+        KILL_TRACES="1"
+        kill_traces 2> /dev/null
+        sleep 0.2
+        exit 0
+        ;;
+      -S)
+        for i in $@; do
+          if [ "$i" = "-nattch" ] || [ "$i" = "-pattch" ] || [ "$i" = "-g" ] || [ "$i" = "-ge" ] || [ "$i" = "-gc" ]; then
+            echo "No se puede usar -S con alguna de las opciones introducidas"
+            echo "scdebug [-h] [-k] -S commName prog [arg...]"
+            exit 6
+          fi
+        done
+        STOP="1"
+        ;;
+      -inv)
+        INV="1"
+        ;;
+      -g)
+        for i in $@; do
+          if [ "$i" = "-nattch" ] || [ "$i" = "-pattch" ] || [ "$i" = "-S" ] || [ "$i" = "-ge" ] || [ "$i" = "-gc" ]; then
+            echo "No se puede usar -g con alguna de las opciones introducidas"
+            echo "scdebug [-h] [-k] -g | -gc | -ge [-inv]"
+            exit 6
+          fi
+        done
+        OPTION_G="1"
+        ;;
+      -ge)
+        for i in $@; do
+          if [ "$i" = "-nattch" ] || [ "$i" = "-pattch" ] || [ "$i" = "-S" ] || [ "$i" = "-g" ] || [ "$i" = "-gc" ]; then
+            echo "No se puede usar -ge con alguna de las opciones introducidas"
+            echo "scdebug [-h] [-k] -g | -gc | -ge [-inv]"
+            exit 6
+          fi
+        done
+        OPTION_GE="1"
+        ;;
+      -gc)
+        for i in $@; do
+          if [ "$i" = "-nattch" ] || [ "$i" = "-pattch" ] || [ "$i" = "-S" ] || [ "$i" = "-g" ] || [ "$i" = "-ge" ]; then
+            echo "No se puede usar -gc con alguna de las opciones introducidas"
+            echo "scdebug [-h] [-k] -g | -gc | -ge [-inv]"
+            exit 6
+          fi
+        done
+        OPTION_GC="1"
+        ;;
+      --help )
+        help
+        exit 0
+        ;;
+      -h )
+        help
+        exit 0
+        ;;
+      -* )
+        if [ "$STRACE_ARGS" = "1" ] && [ -z $PROGRAM ]; then
+          STRACE_ARG_LIST+="$1 "
+        else 
+          if [ -n "$PROGRAM" ]; then
+            PROGRAM_ARGS+=" $1"
+          else 
+            echo "Argumento $1 no válido"
+            usage
+            exit 1           
+          fi
+        fi
+        ;;
+      * )
+        if [ -n "$STOP" ]; then
+          STOP_ARGS+=" $1"
+        fi
+        if [ -n "$PATTCH" ]; then
+          if [ -z "$STOP" ]; then 
+            PATTCH_PID="$1" 
+            pattch_option& 2> /dev/null
+          fi
+        fi
+        if [ -n "$ATTACH" ]; then
+          if [ -z "$STOP" ]; then
+            ATTACH_PROGRAM="$1"  
+            nattch_option& 2> /dev/null
+          fi
+        fi
+        if [ -n "$PROGRAM" ]; then
+          PROGRAM_ARGS+=" $1"
+        else
+          PROGRAM="$1"
+        fi
+        ;;
+    esac
+    shift
+  done
+}
+
+help() {
+  echo "Este programa permite hacer la traza de las llamadas al sistema de cierto proceso
+  pasado por línea de comandos, esta traza se guarda en un archivo y se envía a la carpeta
+  ~/.scdebug/[comando introducido]/
+  
+  -sto [args]: se envían argumentos al comando strace que se ocupa de la traza
+
+  -k: se matan todos los procesos de traza que estén corriendo junto con los trazados
+  
+  -nattch [command ... ]: se hace strace con attach a el último proceso de cada uno de los que se pasen por argumento
+
+  -pattch [PID ...]: se hace strace con attach a cada uno de los PID pasados por argumento"
+}
+
+kill_traces() {
+  for i in $(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2); do
+    if [ "$(cat 2> /dev/null /proc/$i/status | grep "TracerPid" | cut -f 2)" != "0" ]; then
+      kill 2> /dev/null -9 $(cat /proc/$i/status | grep "TracerPid" | cut -f 2)
+      kill 2> /dev/null -9 $i
+    fi
+  done
+}
+
+nattch_option () {
+  PID=$(pgrep -n "$ATTACH_PROGRAM")
+  if [ -z $PID ]; then
+    echo "No hay ningún proceso abierto con el nombre $ATTACH_PROGRAM"
+    ERROR="1"
+    exit 2
+  fi
+  echo "Programa a monitorizar: $ATTACH_PROGRAM"
+  OUTPUT_FILE="$HOME/.scdebug/$ATTACH_PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$ATTACH_PROGRAM"
+  mkdir 2> /dev/null -p $OUTPUT_DIR 
+  (strace 2>&1 $STRACE_ARG_LIST -p $PID -o $OUTPUT_FILE) || STRACE_ERROR="$?"
+  if [ -n "$STRACE_ERROR" ]; then
+    echo "No se pudo monitorizar el programa $ATTACH_PROGRAM, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
+    exit 4
+  fi
+}
+
+pattch_option() {
+  PATTCH_PROGRAM="$(ps -p $PATTCH_PID --no-header | tr -s " " | cut -d " " -f 5)"
+  if [ -z $PATTCH_PROGRAM ]; then
+    echo "No hay ningún proceso abierto con el PID $PATTCH_PID"
+    ERROR="1"
+    exit 2
+  fi
+  echo "Programa a monitorizar: $PATTCH_PROGRAM"
+  OUTPUT_FILE="$HOME/.scdebug/$PATTCH_PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$PATTCH_PROGRAM"
+  mkdir 2>/dev/null -p $OUTPUT_DIR 
+  (strace 2> /dev/null $STRACE_ARG_LIST -p $PATTCH_PID -o $OUTPUT_FILE) || STRACE_ERROR="$?"
+  if [ -n "$STRACE_ERROR" ]; then
+    echo "No se pudo monitorizar el programa con el PID $PATTCH_PID, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
+    ERROR="4"
+    exit 4
+  fi
+}
+
+normal_strace() {
+  OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
+  OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
+  mkdir 2> /dev/null -p $OUTPUT_DIR 
+  strace 2>&1 $STRACE_ARG_LIST -o $OUTPUT_FILE $PROGRAM $PROGRAM_ARGS || STRACE_ERROR="$?"
+  echo "PID del programa: $(pgrep -n $PROGRAM)"
+  if [ -n "$STRACE_ERROR" ]; then
+    echo strace error: $STRACE_ERROR
+    echo "No se pudo monitorizar el programa $PROGRAM, strace falló con el error $STRACE_ERROR" | tee -a $OUTPUT_FILE
+    ERROR="4"
+    exit 4
+  fi
+  exit 0
+}
+
+tracer_and_tracee_pid() {
+  sleep 0.1
+  echo "=========================="
+  echo "Procesos y sus trazadores"
+  echo "=========================="
+  LISTA_PROCESOS="$(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2)"
+  for i in $LISTA_PROCESOS; do
+    NOMBRE=$(ps 2>/dev/null -p $i --no-header | tr -s " " | cut -d " " -f 5)
+    if [ -n "$NOMBRE" ]; then
+      echo "NOMBRE: $NOMBRE"
+      echo "PID: $i"
+      TRACER_PID=$(cat 2>/dev/null /proc/$i/status | grep "TracerPid" | cut -f 2)
+      echo "TracerPid: $TRACER_PID"
+      echo "TracerID: $(ps 2>/dev/null -p $TRACER_PID --no-header | tr -s " " | cut -d " " -f 5)"
+      echo
+    fi
+  done
+  echo "=========================="
+}
+
+stop() {
+  echo -n "traced_$PROGRAM" > /proc/$$/comm
+  kill -SIGSTOP $$
+  LaunchProg="$PROGRAM $PROGRAM_ARGS"
+  exec $LaunchProg
+}
+
+resume_strace_g() {
+  mkdir -p "$HOME/.scdebug/$(ps -p $1 -o comm= | cut -d "_" -f 2)"
+  strace -p $1 -o "$HOME/.scdebug/$(ps -p $1 -o comm= | cut -d "_" -f 2)/trace_$TRACE_ID.txt"&
+  sleep 0.2
+  kill -SIGCONT $1
+  echo "Proceso $1 reanudado y monitorizado"
+}
+
+resume_strace_ge_gc() {
+  TABLE_INFO=$(strace -p $1 -c -U name,max-time,total-time,calls,errors 2>&1 & sleep 1 && kill -SIGCONT $1)
+  max_time_proccess="$(echo -n "$TABLE_INFO" | awk '{print $2,$1}' | sort -nr |  grep "0,0" | grep -v total | head -n 1 | awk '{print $2}')"
+  max_time="$(echo -n "$TABLE_INFO" | awk '{print $2,$1}' | sort -nr |  grep "0,0" | head -n 2 | tail -n 1 | awk '{print $1}')"
+  total_time="$(echo -n "$TABLE_INFO" | grep "total" | awk '{print $3}')"
+  calls="$(echo -n "$TABLE_INFO" | grep "total" | awk '{print $4}')"
+  errors="$(echo -n "$TABLE_INFO" | grep "total" | awk '{print $5}')"
+  TABLE_LINE="$max_time_proccess $max_time $total_time $calls $errors
+"
+}
+
+# Programa principal
+arg_check "$@"
+
+if [ "$?" != "0" ]; then
+  exit $?
+fi
+
+if [ -n "$STOP" ]; then
+  stop
+  exit $?
+fi
+
+if [ -n "$OPTION_G" ]; then
+  RESUME_PIDS=$(ps | grep traced_ | tr -s " " | cut -d " " -f 2)
+  for pid in $RESUME_PIDS; do
+    resume_strace_g "$pid"&
+  done
+  sleep 1
+  exit $?
+fi
+
+if [ -n "$OPTION_GE" ]; then
+  RESUME_PIDS=$(ps | grep traced_ | tr -s " " | cut -d " " -f 2)
+  if [ -z "$RESUME_PIDS" ]; then
+    echo "No hay ningún proceso monitorizado"
+    exit 2
+  fi
+  for pid in $RESUME_PIDS; do
+    resume_strace_ge_gc "$pid"
+    TABLE+="$TABLE_LINE"
+    sleep 0.1
+  done
+  sleep 1
+  echo "========================================================="
+  if [ -n "$INV" ]; then
+    echo "$TABLE" | sort -k 5 -n | column -t --table-column Max_Time_Proccess,Max_Time,Total_Time,Calls,Errors
+  else 
+    echo "$TABLE" | sort -k 5 -nr | column -t --table-column Max_Time_Proccess,Max_Time,Total_Time,Calls,Errors
+  fi
+  echo
+  exit $?
+fi
+
+if [ -n "$OPTION_GC" ]; then
+  RESUME_PIDS=$(ps | grep traced_ | tr -s " " | cut -d " " -f 2)
+  if [ -z "$RESUME_PIDS" ]; then
+    echo "No hay ningún proceso monitorizado"
+    exit 2
+  fi
+  for pid in $RESUME_PIDS; do
+    resume_strace_ge_gc "$pid"
+    TABLE+="$TABLE_LINE"
+    sleep 0.1
+  done
+  sleep 1
+  echo "========================================================="
+  if [ -n "$INV" ]; then
+    echo "$TABLE" | sort -k 4 -n | column -t --table-column Max_Time_Proccess,Max_Time,Total_Time,Calls,Errors
+  else 
+    echo "$TABLE" | sort -k 4 -nr | column -t --table-column Max_Time_Proccess,Max_Time,Total_Time,Calls,Errors
+  fi
+  echo
+  exit $?
+fi
+
+if [ -n "$ATTACH" ] || [ -n "$PATTCH" ]; then
+  if [ -n "$ATTACH" ]; then
+    if [ -z "$ATTACH_PROGRAM" ]; then
+      echo "No se ha introducido ningún programa"
+      usage
+      exit 2
+    fi
+  fi
+  if [ -n "$PATTCH" ]; then
+    if [ -z $PATTCH_PID ]; then
+      echo "No se ha introducido ningún PID"
+      usage
+      exit 2
+    fi
+  fi
+  sleep 0.1
+  tracer_and_tracee_pid
+  exit 0
+else
+  if [ -z "$PROGRAM" ]; then
+    echo "No se ha introducido ningún programa"
+    usage
+    exit 3
+  fi
+  normal_strace&
+  <tracer_and_tracee_pid
+fi
