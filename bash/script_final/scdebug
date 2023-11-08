@@ -26,11 +26,14 @@ TABLE="" # Variable que almacena la tabla de -ge y -gc
 INV="" # Variable que confirma si se ha introducido la opción -inv para invertir la tabla de -ge y -gc
 
 #################### Funciones ####################
+
+# Función que muestra el uso normal del programa
 usage() {
   echo "scdebug [-h] [-sto arg] [-k] [prog [arg …] ] [-nattch progtoattach …] [-pattch pid1 … ]
 --help o -h para más información"
 }
 
+# Función que comprueba los argumentos del programa
 arg_check() {
   while [ -n "$1" ]; do
     case "$1" in
@@ -136,13 +139,13 @@ arg_check() {
         if [ -n "$PATTCH" ]; then
           if [ -z "$STOP" ]; then 
             PATTCH_PID="$1" 
-            pattch_option& 2> /dev/null
+            pattch_option& 2> /dev/null # Llamamos a la función que hace la traza con attach
           fi
         fi
         if [ -n "$ATTACH" ]; then
           if [ -z "$STOP" ]; then
             ATTACH_PROGRAM="$1"  
-            nattch_option& 2> /dev/null
+            nattch_option& 2> /dev/null # Llamamos a la función que hace la traza con attach
           fi
         fi
         if [ -n "$PROGRAM" ]; then
@@ -156,6 +159,7 @@ arg_check() {
   done
 }
 
+# Función que muestra la ayuda del programa
 help() {
   echo "Este programa permite hacer la traza de las llamadas al sistema de cierto proceso
   pasado por línea de comandos, esta traza se guarda en un archivo y se envía a la carpeta
@@ -167,9 +171,18 @@ help() {
   
   -nattch [command ... ]: se hace strace con attach a el último proceso de cada uno de los que se pasen por argumento
 
-  -pattch [PID ...]: se hace strace con attach a cada uno de los PID pasados por argumento"
+  -pattch [PID ...]: se hace strace con attach a cada uno de los PID pasados por argumento
+
+  Existen mas modos de uso, si se incluye la opción -S se podrá dejar un proceos detenido
+  y en una segunda ejecución del script con las opciones -g, -ge o -gc reanudarlos y
+  monitorizarlos, -g muestra los procesos reanudados en un archivo, -ge muestra los
+  procesos reanudados en una tabla ordenada por el número de errores y -gc muestra los
+  procesos reanudados en una tabla ordenada por el número de llamadas al sistema
+  
+  -S prog[args...]: se crea un proceso con nombre traced_prog que se detiene"
 }
 
+# Función que mata todos los procesos de traza que estén corriendo junto con los trazados
 kill_traces() {
   for i in $(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2); do
     if [ "$(cat 2> /dev/null /proc/$i/status | grep "TracerPid" | cut -f 2)" != "0" ]; then
@@ -179,6 +192,7 @@ kill_traces() {
   done
 }
 
+# Función que hace la traza con attach al proceso más reciente con cierto nombre
 nattch_option () {
   PID=$(pgrep -n "$ATTACH_PROGRAM")
   if [ -z $PID ]; then
@@ -196,6 +210,7 @@ nattch_option () {
   fi
 }
 
+# Función que hace la traza con attach para un PID
 pattch_option() {
   PATTCH_PROGRAM="$(ps -p $PATTCH_PID --no-header | tr -s " " | cut -d " " -f 5)"
   if [ -z $PATTCH_PROGRAM ]; then
@@ -213,6 +228,7 @@ pattch_option() {
   fi
 }
 
+# Función que hace la traza normal de un programa
 normal_strace() {
   OUTPUT_FILE="$HOME/.scdebug/$PROGRAM/trace_$TRACE_ID.txt"
   OUTPUT_DIR="$HOME/.scdebug/$PROGRAM"
@@ -227,6 +243,7 @@ normal_strace() {
   exit 0
 }
 
+# Función que muestra una tabla con los procesos del usuario y sus trazadores si es que los tiene
 tracer_and_tracee_pid() {
   sleep 0.1
   LISTA_PROCESOS="$(ps -u $USER --no-header | sort -r | tr -s " " | cut -d " " -f 2)"
@@ -249,7 +266,8 @@ tracer_and_tracee_pid() {
   echo "$Tabla_procesos" | sort -k 2 -nr | column -t --table-column Nombre,PID,TracerPID,TracerID
   echo "========================================================="
 }
-
+ 
+# Función que detiene el proceso que hace la traza (-S)
 stop() {
   echo -n "traced_$PROGRAM" > /proc/$$/comm
   kill -SIGSTOP $$
@@ -257,6 +275,7 @@ stop() {
   exec $LaunchProg
 }
 
+# Función que reanuda un proceso y lo monitoriza (-g)
 resume_strace_g() {
   TRACE_ID=$(uuidgen)
   mkdir -p "$HOME/.scdebug/$(ps -p $1 -o comm= | cut -d "_" -f 2)"
@@ -266,6 +285,7 @@ resume_strace_g() {
   echo "Proceso $1 reanudado y monitorizado"
 }
 
+# Función que reanuda un proceso y lo monitoriza, luego resume los datos en una tabla (-ge y -gc)
 resume_strace_ge_gc() {
   TABLE_INFO=$(strace -p $1 -c -U name,max-time,total-time,calls,errors 2>&1 & sleep 1 && kill -SIGCONT $1)
   max_time_proccess="$(echo -n "$TABLE_INFO" | awk '{print $2,$1}' | sort -nr |  grep "0,0" | grep -v total | head -n 1 | awk '{print $2}')"
