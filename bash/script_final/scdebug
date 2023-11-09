@@ -315,7 +315,7 @@ v_option() {
         echo ==================TIME: $(ls -lt $HOME/.scdebug/$program | head -n 2 | tail -n 1 | tr -s " " | cut -d " " -f 6,7,8)==================
         echo ==================CONTENT:==================
         cat $HOME/.scdebug/$program/$(ls -t $HOME/.scdebug/$program | head -n 1)
-        echo =================================================1
+        echo =================================================
       fi
     done
   fi
@@ -329,7 +329,7 @@ v_option() {
           echo ==================TIME: $(ls -lt $HOME/.scdebug/$program | grep $trace | tr -s " " | cut -d " " -f 6,7,8)==================
           echo ==================CONTENT:==================
           cat $HOME/.scdebug/$program/$trace
-          echo =================================================1
+          echo =================================================
         done
       fi
     done
