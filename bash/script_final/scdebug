@@ -24,7 +24,9 @@ TABLE_INFO="" # Variable que almacena la información de la tabla de -ge y -gc
 TABLE_LINE="" # Variable que almacena una línea de la tabla de -ge y -gc
 TABLE="" # Variable que almacena la tabla de -ge y -gc
 INV="" # Variable que confirma si se ha introducido la opción -inv para invertir la tabla de -ge y -gc
-
+V_OPTION="" # Variable que confirma si se ha introducido la opción -v 
+VALL="" # Variable que confirma si se ha introducido la opción -vall
+V_PROGRAMS="" # Variable que almacena los programas a mostrar con -v y -vall
 #################### Funciones ####################
 
 # Función que muestra el uso normal del programa
@@ -40,6 +42,14 @@ arg_check() {
       -sto )
         STRACE_ARGS="1"
         ;;
+      -v )
+        V_OPTION="1"
+        VALL=""
+        ;;
+      -vall )
+        VALL="1"
+        V_OPTION=""
+        ;;
       -nattch )
         for i in $@; do
           if [ "$i" = "-S" ] || [ "$i" = "-g" ] || [ "$i" = "-ge" ] || [ "$i" = "-gc" ]; then
@@ -48,8 +58,8 @@ arg_check() {
             exit 6
           fi
         done
-        ATTACH="1"
-        PATTCH=""
+          ATTACH="1"
+          PATTCH=""
         ;;
       -pattch )
         for i in $@; do
@@ -111,11 +121,7 @@ arg_check() {
         done
         OPTION_GC="1"
         ;;
-      --help )
-        help
-        exit 0
-        ;;
-      -h )
+      -h | --help )
         help
         exit 0
         ;;
@@ -133,6 +139,9 @@ arg_check() {
         fi
         ;;
       * )
+        if [ -n "$V_OPTION" ] || [ -n "$VALL" ]; then
+          V_PROGRAMS+=" $1"
+        fi
         if [ -n "$STOP" ]; then
           STOP_ARGS+=" $1"
         fi
@@ -297,11 +306,46 @@ resume_strace_ge_gc() {
 "
 }
 
+v_option() {
+  if [ -n "$V_OPTION" ]; then
+    for program in $V_PROGRAMS; do
+      if [ -d "$HOME/.scdebug/$program" ]; then
+        echo ==================COMMAND: $program==================
+        echo ==================TRACE FILE: $(ls -t $HOME/.scdebug/$program | head -n 1)==================
+        echo ==================TIME: $(ls -lt $HOME/.scdebug/$program | head -n 2 | tail -n 1 | tr -s " " | cut -d " " -f 6,7,8)==================
+        echo ==================CONTENT:==================
+        cat $HOME/.scdebug/$program/$(ls -t $HOME/.scdebug/$program | head -n 1)
+        echo =================================================1
+      fi
+    done
+  fi
+  if [ -n "$VALL" ]; then
+    for program in $V_PROGRAMS; do
+      if [ -d "$HOME/.scdebug/$program" ]; then
+        TODAS_LAS_TRACES=$(ls -t $HOME/.scdebug/$program)
+        for trace in $TODAS_LAS_TRACES; do
+          echo ==================COMMAND: $program==================
+          echo ==================TRACE FILE: $trace==================
+          echo ==================TIME: $(ls -lt $HOME/.scdebug/$program | grep $trace | tr -s " " | cut -d " " -f 6,7,8)==================
+          echo ==================CONTENT:==================
+          cat $HOME/.scdebug/$program/$trace
+          echo =================================================1
+        done
+      fi
+    done
+  fi
+}
+
 #################### Main ####################
 arg_check "$@" # Llamamos a la función que comprueba las opciones del script
 
 if [ "$?" != "0" ]; then # Vemos que nada haya fallado en la comprobación de argumentos
   exit $?
+fi
+
+if [ -n "$V_OPTION" ] || [ -n "$VALL" ]; then # Si se ha introducido la opción -v
+  v_option
+  exit 0
 fi
 
 if [ -n "$STOP" ]; then # Si se ha introducido la opción -S
