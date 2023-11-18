@@ -9,7 +9,7 @@
 # @brief Makefile del proyecto, permite compilar facilmente y hacer make clean
 #		 para borrar los binarios de la carpeta después
 
-CXX = g++
+CXX = g++-13
 CXXFLAGS = -std=c++23 -Wall
 ######################################
 files = src/*cc

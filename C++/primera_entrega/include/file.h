@@ -10,6 +10,9 @@
  * @brief Este archivo contiene la declaración de la clase File, para implementar la lectura
  *        de archivos usando la llamada al sistema read().
  */
+#ifndef FILE_H
+#define FILE_H
+
 #include <iostream>
 #include <string>
 #include <system_error>
@@ -18,6 +21,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+/**
+ * Clase File para implementar la lectura de archivos usando la llamada al sistema read()
+ */
 class File {
  public:
   // Constructores
@@ -33,3 +39,5 @@ class File {
   int fd_;
   std::vector<uint8_t> buffer_;
 };
+
+#endif
