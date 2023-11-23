@@ -12,6 +12,7 @@
 
 #include "../include/file.h"
 #include "../include/socket.h"
+#include "../include/tools.h"
 
 /**
  * Función main del programa netcp
@@ -22,6 +23,7 @@
  * @return 0 si se ejecuta correctamente, cualquier otro valor en caso contrario
  */
 int main(int argc, char* argv[]) {
+  Usage(argc, argv);
   // Creamos y leemos archivo
   File file{argv[1]};
   // Enviamos la información del archivo
