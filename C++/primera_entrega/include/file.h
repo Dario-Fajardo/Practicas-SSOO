@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 /**
  * Clase File para implementar la lectura de archivos usando la llamada al sistema read()
@@ -38,6 +39,7 @@ class File {
  private:
   int fd_;
   std::vector<uint8_t> buffer_;
+  struct stat file_info_;
 };
 
 #endif

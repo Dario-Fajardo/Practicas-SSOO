@@ -39,6 +39,13 @@ Socket::Socket(std::optional<std::string> ip_address, uint16_t port) {
 }
 
 /**
+ * Destructor de la clase Socket
+ */
+Socket::~Socket() {
+  close(fd_);
+}
+
+/**
  * Método de la clase Socket que crea un socket y lo bindea a una dirección IP en caso de introducirla
  * 
  * @param address Dirección IP en formato sockaddr_in (opcional)
@@ -47,13 +54,15 @@ Socket::Socket(std::optional<std::string> ip_address, uint16_t port) {
  */
 make_socket_result Socket::make_socket(const std::optional<sockaddr_in>& address) const {
   int fd{socket(AF_INET, SOCK_DGRAM, 0)};
-  if (address != std::nullopt) {
+  if (address.has_value()) {
     if (fd) {
       bind(fd, reinterpret_cast<const sockaddr*>(&address.value()), sizeof(sockaddr_in));
       return fd;
     } else {
       return std::make_error_code(std::errc(1)).value();
     }
+  } else {
+    return fd;
   }
 }
 

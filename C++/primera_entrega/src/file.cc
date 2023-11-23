@@ -26,10 +26,21 @@ File::File() {
  * @param pathname: la ruta al archivo del que se sacará la información
  */
 File::File(const std::string& pathname) {
-  try {
-    fd_ = open(pathname.c_str(), O_RDONLY);
-  } catch (int error) {
-    throw std::system_error(errno, std::system_category(), "Error opening file");
+  fd_ = open(pathname.c_str(), O_RDONLY); // Abrimos el archivo en modo lectura
+  if (fd_ < 0) { // Si hay error, lo imprimimos por pantalla y salimos del programa
+    std::cerr << "Error opening file:" << std::error_code(errno, std::system_category()).message() << std::endl;
+    exit(1);
+  }
+  std::vector<uint8_t> buffer(16ul * 1024 * 1024); // Creamos un buffer
+  std::error_code error = read_file(fd_, buffer); // Leemos el archivo y lo guardamos en el buffer
+  if (error) { // Si hay error, lo imprimimos por pantalla y salimos del programa
+    std::cerr << "Error reading file: " << error.message() << std::endl;
+    exit(1);
+  }
+  stat(pathname.c_str(), &file_info_); // Obtenemos información del archivo
+  if (file_info_.st_size > 1024) { // Si el archivo es mayor de 1KB, salimos del programa
+    std::cerr << "File size is bigger than 1KB" << std::endl;
+    exit(1);
   }
 }
 

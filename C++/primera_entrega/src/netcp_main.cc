@@ -24,15 +24,9 @@
 int main(int argc, char* argv[]) {
   // Creamos y leemos archivo
   File file{argv[1]};
-  std::vector<uint8_t> buffer(16ul * 1024 * 1024);
-  std::error_code error = file.read_file(file.GetFileDescriptor(), buffer);
-  if (error) {
-    std::cerr << "Error reading file: " << error.message() << std::endl;
-    return 1;
-  }
   // Enviamos la información del archivo
   Socket socket{std::nullopt, 8080};
-  socket.send_to(socket.GetFileDescriptor(), buffer, socket.make_ip_address("192.168.1.38", 8080).value());
+  socket.send_to(socket.GetFileDescriptor(), file.GetBuffer(), socket.make_ip_address("127.0.0.1", 8080).value());
   std::cout << std::endl;
   return 0;
 }

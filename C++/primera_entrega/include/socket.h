@@ -33,6 +33,8 @@ class Socket {
   // Constructores
   Socket();
   Socket(std::optional<std::string> ip_address = std::nullopt, uint16_t port = 0);
+  // Destructor
+  ~Socket();
   // Getters
   int GetFileDescriptor() const { return fd_; }
   std::optional<sockaddr_in> GetIpAddress() const { return ip_address_; }
