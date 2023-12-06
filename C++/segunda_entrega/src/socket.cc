@@ -26,7 +26,7 @@ Socket::Socket() {
  * @param ip_address Dirección IP en formato std::string (opcional)
  * @param port Puerto
  */
-Socket::Socket(std::optional<std::string> ip_address, uint16_t port) {
+Socket::Socket(std::optional<std::string> ip_address, const uint16_t port) {
   if (ip_address.has_value()) {
     ip_address_ = make_ip_address(ip_address, port);
   } else {
@@ -39,7 +39,7 @@ Socket::Socket(std::optional<std::string> ip_address, uint16_t port) {
 }
 
 /**
- * Destructor de la clase Socket
+ * Destructor de la clase Socket, cierra el socket para evitar problemas
  */
 Socket::~Socket() {
   close(fd_);
@@ -96,13 +96,34 @@ std::optional<sockaddr_in> Socket::make_ip_address(const std::optional<std::stri
  * 
  * @return Código de error
  */
-std::error_code Socket::send_to(int fd, const std::vector<uint8_t>& message, const sockaddr_in& address) {
+std::error_code Socket::send_to(int fd, const std::vector<uint8_t>& message, const sockaddr_in& address) const {
   std::error_code error{std::make_error_code(std::errc(0))};
   int bytes_sent = sendto(fd, message.data(), message.size(), 0, reinterpret_cast<const sockaddr*>(&address), sizeof(sockaddr_in));
-  if (bytes_sent < 0) {
+  if (bytes_sent < 0) { // Si hay error en el envío
     error = std::make_error_code(std::errc(2));
   }
   return error;
+}
+
+std::string Socket::Recieve(sockaddr_in& transmitter) const {
+  std::string message_text{};
+  message_text.resize(1024);
+  std::string final_message;
+  socklen_t addr_len{sizeof(transmitter)};
+  int bytes_read = recvfrom(fd_, message_text.data(), message_text.size(), 0, reinterpret_cast<sockaddr*>(&transmitter), &addr_len);
+  while (bytes_read != 0) {
+    std::cout << "[NETCP]: PAQUETE RECIBIDO\n";
+    bytes_read = recvfrom(fd_, message_text.data(), message_text.size(), 0, reinterpret_cast<sockaddr*>(&transmitter), &addr_len);
+    if (bytes_read < 0) {
+      std::cerr << "Error al recibir el mensaje\n";
+      exit(1);
+    }
+    message_text.resize(bytes_read);
+    final_message += message_text;
+  }
+  std::cout << "[NETCP]: MENSAJE RECIBIDO CON ÉXITO\n";
+  std::cout << final_message << "\n";
+  return final_message;
 }
 
 /**

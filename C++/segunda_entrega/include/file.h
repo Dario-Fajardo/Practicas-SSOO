@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "socket.h"
 
 /**
  * Clase File para implementar la lectura de archivos usando la llamada al sistema read()
@@ -29,12 +30,16 @@ class File {
  public:
   // Constructores
   File();
-  File(const std::string& pathname);
+  File(const std::string& pathname, int mode);
+  // Destructor
+  ~File();
   // Getters
   int GetFileDescriptor() const { return fd_; }
   std::vector<uint8_t> GetBuffer() const { return buffer_; }
   // Otros métodos
-  void PrintFile();
+  void PrintFile() const;
+  int WriteFile(const std::vector<uint8_t>& data) const;
+  int WriteFile(const std::string& data) const;
   std::error_code read_file(int fd, std::vector<uint8_t>& buffer); 
  private:
   int fd_;

@@ -6,7 +6,7 @@
  * Programación de aplicaciones
  *
  * @author Dario Fajardo alu0101564630@ull.edu.es
- * @date 17 Nov 2023
+ * @date 27 Nov 2023
  * @brief Archivo main del programa netcp.
  */
 
@@ -23,12 +23,27 @@
  * @return 0 si se ejecuta correctamente, cualquier otro valor en caso contrario
  */
 int main(int argc, char* argv[]) {
-  Usage(argc, argv);
-  // Creamos y leemos archivo
-  File file{argv[1]};
-  // Enviamos la información del archivo
-  Socket socket{std::nullopt, 8080};
-  socket.send_to(socket.GetFileDescriptor(), file.GetBuffer(), socket.make_ip_address("127.0.0.1", 8080).value());
-  std::cout << std::endl;
+  // Argumentos y uso básico
+  // Usage(argc, argv);
+  bool recieve_mode{false};
+  std::string file_name;
+  for (int i{1}; i < argc; ++i) { // Manejo de argumentos para ver en que modo se ejecuta el programa
+    std::string parameter{argv[i]};
+    if (parameter == "-l") {
+      recieve_mode = true;
+    } else {
+      file_name = parameter;
+    }
+  }
+  // Enviar / Recibir mensajes
+  if (recieve_mode) {
+    File file(file_name, 1);
+    Socket socket{"10.0.2.15", 8080};
+    sockaddr_in remote_address{};
+    std::string message{socket.Recieve(remote_address)};
+    file.WriteFile(message);
+  } else {
+    File file(file_name, 0);
+  }
   return 0;
 }

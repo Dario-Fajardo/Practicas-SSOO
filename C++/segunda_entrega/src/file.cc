@@ -25,34 +25,75 @@ File::File() {
  * 
  * @param pathname: la ruta al archivo del que se sacará la información
  */
-File::File(const std::string& pathname) {
-  fd_ = open(pathname.c_str(), O_RDONLY); // Abrimos el archivo en modo lectura
+File::File(const std::string& pathname, int mode) {
+  if (mode == 0) {
+    fd_ = open(pathname.c_str(), O_RDONLY); // Abrimos el archivo en modo lectura
+  } else if (mode == 1) {
+    fd_ = open(pathname.c_str(), O_WRONLY);
+  }
   if (fd_ < 0) { // Si hay error, lo imprimimos por pantalla y salimos del programa
     std::cerr << "Error opening file:" << std::error_code(errno, std::system_category()).message() << std::endl;
     exit(1);
   }
-  std::vector<uint8_t> buffer(16ul * 1024 * 1024); // Creamos un buffer
-  std::error_code error = read_file(fd_, buffer); // Leemos el archivo y lo guardamos en el buffer
-  if (error) { // Si hay error, lo imprimimos por pantalla y salimos del programa
-    std::cerr << "Error reading file: " << error.message() << std::endl;
-    exit(1);
-  }
   stat(pathname.c_str(), &file_info_); // Obtenemos información del archivo
-  if (file_info_.st_size > 1024) { // Si el archivo es mayor de 1KB, salimos del programa
-    std::cerr << "File size is bigger than 1KB" << std::endl;
-    exit(1);
+  std::vector<uint8_t> buffer; // Creamos un buffer
+  buffer.resize(1024); // Le damos un tamaño inicial de 1024 bytes (1KB)
+  if (mode == 0) {
+    Socket socket{"10.0.2.15", 8080};
+    std::error_code error = read_file(fd_, buffer); // Leemos el archivo y lo guardamos en el buffer
+    if (error) { // Si hay error, lo imprimimos por pantalla y salimos del programa
+      std::cerr << "Error reading file: " << error.message() << std::endl;
+      exit(1);
+    }
+    int total_packets = (file_info_.st_size / 1024);
+    if (file_info_.st_size % 1024 != 0) {
+      total_packets++;
+    }
+    int packet_number{1};
+    int sended_bytes{0};
+    while (!buffer.empty()) { // Mientras haya datos que leer
+      socket.send_to(socket.GetFileDescriptor(), buffer, socket.make_ip_address("10.0.2.15", 8080).value());
+      sended_bytes += buffer.size();
+      std::cout << "[NETCP]: PAQUETE " << packet_number << " DE " << total_packets << " ENVIADO (";
+      std::cout << sended_bytes << " B ---> " << file_info_.st_size << " B)" << std::endl;
+      packet_number++;
+      std::error_code error = read_file(fd_, buffer); // Leemos el archivo y lo guardamos en el buffer
+      if (error) { // Si hay error, lo imprimimos por pantalla y salimos del programa
+      std::cerr << "Error reading file: " << error.message() << std::endl;
+      exit(1);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    std::cout << "[NETCP]: ARCHIVO ENVIADO CON ÉXITO" << std::endl;
+    buffer.clear();
+    socket.send_to(socket.GetFileDescriptor(), buffer, socket.make_ip_address("10.0.2.15", 8080).value());
   }
+}
+
+/**
+ * Destructor de la clase File, cierra el descriptor de archivo
+*/
+File::~File() {
+  close(fd_);
 }
 
 /**
  * Método para imprimir por pantalla el buffer con los bytes de un archivo de la clase
  * File
  */
-void File::PrintFile() {
+void File::PrintFile() const {
   for (const auto& byte : buffer_) {
     std::cout << byte;
   }
   std::cout << std::endl;
+}
+
+int File::WriteFile(const std::vector<uint8_t>& data) const {
+  return write(fd_, data.data(), file_info_.st_size);
+}
+
+int File::WriteFile(const std::string& data) const {
+  return write(fd_, data.c_str(), file_info_.st_size);
 }
 
 /**
