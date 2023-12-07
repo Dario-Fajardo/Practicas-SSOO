@@ -12,6 +12,8 @@
  */
 #include "../include/socket.h"
 
+std::atomic_bool quit_app{false};
+
 /**
  * Constructor por defecto de la clase Socket por si se instancia sin parámetros
  */
@@ -30,7 +32,7 @@ Socket::Socket(std::optional<std::string> ip_address, const uint16_t port) {
   if (ip_address.has_value()) {
     ip_address_ = make_ip_address(ip_address, port);
   } else {
-    ip_address_ = std::nullopt;
+    ip_address_ = make_ip_address(std::nullopt, port);
   }
   auto fd_or_error = make_socket(ip_address_).value();
   if (fd_or_error) {
@@ -65,7 +67,6 @@ make_socket_result Socket::make_socket(const std::optional<sockaddr_in>& address
     return fd;
   }
 }
-
 
 /**
  * Método de la clase Socket que crea una dirección IP a partir de una dirección IP en formato std::string y un puerto
@@ -106,23 +107,40 @@ std::error_code Socket::send_to(int fd, const std::vector<uint8_t>& message, con
 }
 
 std::string Socket::Recieve(sockaddr_in& transmitter) const {
-  std::string message_text{};
+  std::string message_text;
   message_text.resize(1024);
   std::string final_message;
   socklen_t addr_len{sizeof(transmitter)};
   int bytes_read = recvfrom(fd_, message_text.data(), message_text.size(), 0, reinterpret_cast<sockaddr*>(&transmitter), &addr_len);
+  if (quit_app) {
+    std::cout << "[NETCP]: SEÑAL DE TERMINACIÓN RECIBIDA, CERRANDO SOCKET...\n";
+    close(fd_);
+    exit(10);
+  }
+  std::cout << "[NETCP]: PAQUETE RECIBIDO\n";
+  std::cout << "[NETCP]: TAMAÑO DEL PAQUETE: " << bytes_read << " B\n";
+  message_text.resize(bytes_read);
+  final_message += message_text;
   while (bytes_read != 0) {
-    std::cout << "[NETCP]: PAQUETE RECIBIDO\n";
     bytes_read = recvfrom(fd_, message_text.data(), message_text.size(), 0, reinterpret_cast<sockaddr*>(&transmitter), &addr_len);
+    if (quit_app) {
+      std::cout << "[NETCP]: SEÑAL DE TERMINACIÓN RECIBIDA, CERRANDO SOCKET...\n";
+      close(fd_);
+      exit(10);
+    }
+    if (bytes_read > 0) {
+    std::cout << "[NETCP]: PAQUETE RECIBIDO\n";
+    std::cout << "[NETCP]: TAMAÑO DEL PAQUETE: " << bytes_read << " B\n";
+    }
     if (bytes_read < 0) {
-      std::cerr << "Error al recibir el mensaje\n";
-      exit(1);
+      std::cerr << "[NETCP]: ERROR RECIBIENDO EL MENSAJE\n";
+      exit(3);
     }
     message_text.resize(bytes_read);
     final_message += message_text;
   }
   std::cout << "[NETCP]: MENSAJE RECIBIDO CON ÉXITO\n";
-  std::cout << final_message << "\n";
+  std::cout << "[NETCP]: TAMAÑO DEL MENSAJE: " << final_message.size() << " B\n";
   return final_message;
 }
 

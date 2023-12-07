@@ -12,17 +12,65 @@
 
 #include "../include/tools.h"
 
-void Usage(int argc, char* argv[]) {
-  if (argc != 2) {
-    std::cerr << argv[0] << ": Falta un número como parámetro." << std::endl;
-    std::cerr << "Pruebe " << argv[0] << " --help para más información." << std::endl;
-    exit(EXIT_FAILURE);
+void Usage(int argc, char* argv[], int& mode) {
+  mode = 2;
+  for (int i{0}; i < argc; i++) { // Procesar argumentos
+    if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h") {
+      mode = 3;
+    }
+    if (std::string(argv[i]) == "--listen" || std::string(argv[i]) == "-l") {
+      mode = 1;
+    }
   }
-  std::string parameter{argv[1]};
-  if (parameter == "--help" || parameter == "-h") {
-    std::cout << "Este programa recibe como parámetro un archivo y lo envía a la dirección IP de LOOPBACK del sistema.\n";
-    std::cout << "Sintaxis: " << argv[0] << " <nombre_archivo>\n";
-    std::cout << "Los archivos solo pueden ser de máximo 1KB. Para ver que se reciba, corra en otra terminal el comando netcat -lu 8080\n";
-    exit(EXIT_SUCCESS);
+  if (mode == 1) { // Comprobar argumentos para el modo escucha
+    if (argc != 3) {
+      std::cerr << "Número de argumentos incorrecto para el modo escucha\n";
+      std::cerr << "Uso: ./netcp [-h | --help] [--listen | -l] nombre_archivo\n";
+      exit(11);
+    }
+  } else if (mode == 2) { // Comprobar argumentos para el modo enviar
+    if (argc != 2) {
+      std::cerr << "Número de argumentos incorrecto para el modo enviar\n";
+      std::cerr << "Uso: ./netcp nombre_archivo\n";
+      exit(12);
+    }
+  }
+  if (mode == 3) { // Mostrar ayuda
+    std::cout << "Este programa permite enviar la información de un archivo cualquiera desde una dirección ip pasada\n";
+    std::cout << "por variables de entorno por un puerto también pasado de este modo, para recibir dicha infomación \n";
+    std::cout << "se debe ejecutar el programa con la opción --listen o -l y el nombre del archivo en el que se guardará.\n";
+    std::cout << "la información recibida.\n\n";
+    std::cout << "Uso: ./netcp [-h | --help] [--listen | -l] nombre_archivo\n";
+    return;
+  }
+}
+
+void SignalHandler(int signal) {
+  std::string message;
+  switch (signal) {
+    case SIGINT:
+      message = "[NETCP]: SEÑAL SIGINT RECIBIDA TERMINANDO...\n";
+      write(STDOUT_FILENO, message.data(), message.size());
+      quit_app = true;
+      break;
+    case SIGTERM:
+      message = "[NETCP]: SEÑAL SIGTERM RECIBIDA TERMINANDO...\n";
+      write(STDOUT_FILENO, message.data(), message.size());
+      quit_app = true;
+      break;
+    case SIGQUIT:
+      message = "[NETCP]: SEÑAL SIGQUIT RECIBIDA TERMINANDO...\n";
+      write(STDOUT_FILENO, message.data(), message.size());
+      quit_app = true;
+      break;
+    case SIGHUP:
+      message = "[NETCP]: SEÑAL SIGHUP RECIBIDA TERMINANDO...\n";
+      write(STDOUT_FILENO, message.data(), message.size());
+      quit_app = true;
+      break;
+    default:
+      message = "[NETCP]: SEÑAL DESCONOCIDA RECIBIDA\n";
+      write(STDOUT_FILENO, message.data(), message.size());
+      break;
   }
 }

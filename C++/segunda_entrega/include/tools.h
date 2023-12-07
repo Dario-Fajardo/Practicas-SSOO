@@ -9,6 +9,17 @@
  * @date 23 Nov 2023
  * @brief Archivo tools.h para implementar las funciones auxiliares del programa netcp.
  */
-#include <iostream>
+#ifndef TOOLS_H_
+#define TOOLS_H_
 
-void Usage(int argc, char* argv[]);
+#include <iostream>
+#include <signal.h>
+#include <stdatomic.h>
+#include <vector>
+
+extern std::atomic_bool quit_app;
+
+void Usage(int argc, char* argv[], int& mode);
+void SignalHandler(int signal);
+
+#endif // TOOLS_H_

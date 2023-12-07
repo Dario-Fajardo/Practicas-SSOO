@@ -25,25 +25,31 @@ File::File() {
  * 
  * @param pathname: la ruta al archivo del que se sacará la información
  */
-File::File(const std::string& pathname, int mode) {
+File::File(const std::string& pathname, const int mode, const std::string& ip_address, const uint16_t port) {
   if (mode == 0) {
     fd_ = open(pathname.c_str(), O_RDONLY); // Abrimos el archivo en modo lectura
   } else if (mode == 1) {
     fd_ = open(pathname.c_str(), O_WRONLY);
   }
   if (fd_ < 0) { // Si hay error, lo imprimimos por pantalla y salimos del programa
-    std::cerr << "Error opening file:" << std::error_code(errno, std::system_category()).message() << std::endl;
+    std::cerr << "[NETCP]: ERROR AL ABRIR EL ARCHIVO A ENVIAR, COMPRUEBE QUE EXISTA\n" << std::error_code(errno, std::system_category()).message() << std::endl;
     exit(1);
   }
   stat(pathname.c_str(), &file_info_); // Obtenemos información del archivo
   std::vector<uint8_t> buffer; // Creamos un buffer
   buffer.resize(1024); // Le damos un tamaño inicial de 1024 bytes (1KB)
   if (mode == 0) {
-    Socket socket{"10.0.2.15", 8080};
+    Socket socket{ip_address, port};
     std::error_code error = read_file(fd_, buffer); // Leemos el archivo y lo guardamos en el buffer
     if (error) { // Si hay error, lo imprimimos por pantalla y salimos del programa
       std::cerr << "Error reading file: " << error.message() << std::endl;
       exit(1);
+    }
+    if (quit_app) {
+      std::cout << "[NETCP]: SEÑAL DE TERMINACIÓN RECIBIDA, CERRANDO SOCKET...\n";
+      close(fd_);
+      socket.~Socket();
+      exit(10);
     }
     int total_packets = (file_info_.st_size / 1024);
     if (file_info_.st_size % 1024 != 0) {
@@ -52,21 +58,33 @@ File::File(const std::string& pathname, int mode) {
     int packet_number{1};
     int sended_bytes{0};
     while (!buffer.empty()) { // Mientras haya datos que leer
-      socket.send_to(socket.GetFileDescriptor(), buffer, socket.make_ip_address("10.0.2.15", 8080).value());
+      socket.send_to(socket.GetFileDescriptor(), buffer, socket.make_ip_address(ip_address, port).value()); // Enviamos el buffer por red
       sended_bytes += buffer.size();
       std::cout << "[NETCP]: PAQUETE " << packet_number << " DE " << total_packets << " ENVIADO (";
       std::cout << sended_bytes << " B ---> " << file_info_.st_size << " B)" << std::endl;
       packet_number++;
+      if (quit_app) {
+        std::cout << "[NETCP]: SEÑAL DE TERMINACIÓN RECIBIDA, CERRANDO SOCKET...\n";
+        close(fd_);
+        socket.~Socket();
+        exit(10);
+      }
       std::error_code error = read_file(fd_, buffer); // Leemos el archivo y lo guardamos en el buffer
       if (error) { // Si hay error, lo imprimimos por pantalla y salimos del programa
-      std::cerr << "Error reading file: " << error.message() << std::endl;
-      exit(1);
+      std::cerr << "[NETCP]: ERROR LEYENDO EL ARCHIVO A ENVIAR\n" << error.message() << std::endl;
+      exit(2);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(std::chrono::milliseconds(5)); // Pequeña espera para evitar errores en el envío
     }
     std::cout << "[NETCP]: ARCHIVO ENVIADO CON ÉXITO" << std::endl;
     buffer.clear();
-    socket.send_to(socket.GetFileDescriptor(), buffer, socket.make_ip_address("10.0.2.15", 8080).value());
+    socket.send_to(socket.GetFileDescriptor(), buffer, socket.make_ip_address(ip_address, port).value());
+    if (quit_app) {
+      std::cout << "[NETCP]: SEÑAL DE TERMINACIÓN RECIBIDA, CERRANDO SOCKET...\n";
+      close(fd_);
+      socket.~Socket();
+      exit(10);
+    }
   }
 }
 
@@ -88,12 +106,38 @@ void File::PrintFile() const {
   std::cout << std::endl;
 }
 
+/**
+ * Método de la clase File que permite escribir los datos recibidos por red en un archivo
+ * 
+ * @param data: std::vector con los datos recibidos por red
+ * 
+ * @return el número de bytes escritos en el archivo
+ */
 int File::WriteFile(const std::vector<uint8_t>& data) const {
-  return write(fd_, data.data(), file_info_.st_size);
+  if (quit_app) {
+    std::cout << "[NETCP]: SEÑAL DE TERMINACIÓN RECIBIDA, CERRANDO SOCKET...\n";
+    close(fd_);
+    exit(10);
+  }
+  int bytes_written = write(fd_, data.data(), data.size());
+  return bytes_written;
 }
 
+/**
+ * Método de la clase File que permite escribir los datos recibidos por red en un archivo
+ * 
+ * @param data: std::string con los datos recibidos por red
+ * 
+ * @return el número de bytes escritos en el archivo
+ */
 int File::WriteFile(const std::string& data) const {
-  return write(fd_, data.c_str(), file_info_.st_size);
+  if (quit_app) {
+    std::cout << "[NETCP]: SEÑAL DE TERMINACIÓN RECIBIDA, CERRANDO SOCKET...\n";
+    close(fd_);
+    exit(10);
+  }
+  int bytes_written = write(fd_, data.data(), data.size());
+  return bytes_written;
 }
 
 /**

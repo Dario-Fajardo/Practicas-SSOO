@@ -33,7 +33,7 @@ class Socket {
  public:
   // Constructores
   Socket();
-  Socket(std::optional<std::string> ip_address = std::nullopt, const uint16_t port = 8080);
+  Socket(std::optional<std::string> ip_address = "10.0.2.15", const uint16_t port = 8080);
   // Destructor
   ~Socket();
   // Getters

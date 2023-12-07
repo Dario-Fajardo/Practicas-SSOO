@@ -22,15 +22,16 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "socket.h"
+#include "tools.h"
 
 /**
- * Clase File para implementar la lectura de archivos usando la llamada al sistema read()
+ * Clase File para enviar la información de los archivos instanciados usando la clase Socket
  */
 class File {
  public:
   // Constructores
   File();
-  File(const std::string& pathname, int mode);
+  File(const std::string& pathname = "", const int mode = 0, const std::string& ip_address = "127.0.0.1", const uint16_t port = 8080);
   // Destructor
   ~File();
   // Getters
