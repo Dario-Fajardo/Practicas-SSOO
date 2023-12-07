@@ -29,7 +29,7 @@ File::File(const std::string& pathname, const int mode, const std::string& ip_ad
   if (mode == 0) {
     fd_ = open(pathname.c_str(), O_RDONLY); // Abrimos el archivo en modo lectura
   } else if (mode == 1) {
-    fd_ = open(pathname.c_str(), O_WRONLY);
+    fd_ = open(pathname.c_str(), O_WRONLY | O_CREAT, 0666); // Abrimos el archivo en modo escritura
   }
   if (fd_ < 0) { // Si hay error, lo imprimimos por pantalla y salimos del programa
     std::cerr << "[NETCP]: ERROR AL ABRIR EL ARCHIVO A ENVIAR, COMPRUEBE QUE EXISTA\n" << std::error_code(errno, std::system_category()).message() << std::endl;
