@@ -20,12 +20,12 @@ programa: $(files)
 	@echo "======================================================"
 	@echo "chambeando..."
 	@echo "======================================================"
-	@$(CXX) $(CXXFLAGS) -o netcp $(files)
+	@$(CXX) $(CXXFLAGS) -o bin/netcp $(files)
 
 ######################################
 .PHONY: clean
 ######################################
 clean:
 	@echo "cleaning up the directory..."
-	@rm netcp
+	@rm bin/netcp
 ######################################

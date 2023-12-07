@@ -49,22 +49,30 @@ void SignalHandler(int signal) {
   std::string message;
   switch (signal) {
     case SIGINT:
-      message = "[NETCP]: SEÑAL SIGINT RECIBIDA TERMINANDO...\n";
+      message = "[NETCP]: SEÑAL SIGINT (";
+      message += std::to_string(signal);
+      message += ") RECIBIDA TERMINANDO...\n";
       write(STDOUT_FILENO, message.data(), message.size());
       quit_app = true;
       break;
     case SIGTERM:
-      message = "[NETCP]: SEÑAL SIGTERM RECIBIDA TERMINANDO...\n";
+      message = "[NETCP]: SEÑAL SIGTERM (";
+      message += std::to_string(signal);
+      message += ") RECIBIDA TERMINANDO...\n";
       write(STDOUT_FILENO, message.data(), message.size());
       quit_app = true;
       break;
     case SIGQUIT:
-      message = "[NETCP]: SEÑAL SIGQUIT RECIBIDA TERMINANDO...\n";
+      message = "[NETCP]: SEÑAL SIGQUIT (";
+      message += std::to_string(signal);
+      message += ") RECIBIDA TERMINANDO...\n";
       write(STDOUT_FILENO, message.data(), message.size());
       quit_app = true;
       break;
     case SIGHUP:
-      message = "[NETCP]: SEÑAL SIGHUP RECIBIDA TERMINANDO...\n";
+      message = "[NETCP]: SEÑAL SIGHUP (";
+      message += std::to_string(signal);
+      message += ") RECIBIDA TERMINANDO...\n";
       write(STDOUT_FILENO, message.data(), message.size());
       quit_app = true;
       break;
