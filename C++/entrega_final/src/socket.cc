@@ -58,6 +58,7 @@ make_socket_result Socket::make_socket(const std::optional<sockaddr_in>& address
   int fd{socket(AF_INET, SOCK_DGRAM, 0)};
   if (address.has_value()) {
     if (fd) {
+      std::cout << "binding with" << address.value().sin_port << "\n";
       bind(fd, reinterpret_cast<const sockaddr*>(&address.value()), sizeof(sockaddr_in));
       return fd;
     } else {
@@ -79,7 +80,7 @@ make_socket_result Socket::make_socket(const std::optional<sockaddr_in>& address
 std::optional<sockaddr_in> Socket::make_ip_address(const std::optional<std::string>& ip_address_string, uint16_t port) const {
   sockaddr_in ip_address;
   ip_address.sin_family = AF_INET;
-  ip_address.sin_port = port;
+  ip_address.sin_port = htons(port);
   if (ip_address_string.has_value()) {
     std::string ip_address_string_copy = ip_address_string.value();
     if (ip_address_string_copy.find(':') != std::string::npos) {
