@@ -139,10 +139,7 @@ int main(int argc, char* argv[]) {
       if (error.value() != 0) {
         return error.value();
       }
-      error = sub_process.Wait();
-      if (error.value() != 0) {
-        return error.value();
-      }
+      sub_process.Wait();
       // Leemos la salida del subproceso y la enviamos
       File sending{sub_process.GetStdoutFd(), ip_address, port};
     }
