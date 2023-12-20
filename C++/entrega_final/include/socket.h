@@ -44,7 +44,7 @@ class Socket {
   std::string ip_address_to_string(const sockaddr_in& address) const;
   make_socket_result make_socket(const std::optional<sockaddr_in>& address = std::nullopt) const;
   std::error_code send_to(int fd, const std::vector<uint8_t>& message, const sockaddr_in& address) const;
-  std::string Recieve(sockaddr_in& transmitter) const;
+  std::error_code Recieve(sockaddr_in& transmitter, std::string& message) const;
  private:
   int fd_;
   std::optional<sockaddr_in> ip_address_;

@@ -58,7 +58,6 @@ make_socket_result Socket::make_socket(const std::optional<sockaddr_in>& address
   int fd{socket(AF_INET, SOCK_DGRAM, 0)};
   if (address.has_value()) {
     if (fd) {
-      std::cout << "binding with" << address.value().sin_port << "\n";
       bind(fd, reinterpret_cast<const sockaddr*>(&address.value()), sizeof(sockaddr_in));
       return fd;
     } else {
@@ -86,7 +85,7 @@ std::optional<sockaddr_in> Socket::make_ip_address(const std::optional<std::stri
     if (ip_address_string_copy.find(':') != std::string::npos) {
       if (port != 0) {
         std::cerr << "[NETCP]: ERROR: PUERTO ESPECIFICADO DOS VECES EN make_ip_address()\n";
-        exit(7);
+        return std::nullopt;
       }
       ip_address_string_copy = ip_address_string_copy.substr(0, ip_address_string_copy.find(':'));
       ip_address.sin_port = htons(std::stoi(ip_address_string.value().substr(ip_address_string.value().find(':') + 1)));
@@ -123,7 +122,7 @@ std::error_code Socket::send_to(int fd, const std::vector<uint8_t>& message, con
  * 
  * @return String con el mensaje recibido
  */
-std::string Socket::Recieve(sockaddr_in& transmitter) const {
+std::error_code Socket::Recieve(sockaddr_in& transmitter, std::string& message) const {
   std::string message_text;
   message_text.resize(1024);
   std::string final_message;
@@ -151,14 +150,15 @@ std::string Socket::Recieve(sockaddr_in& transmitter) const {
     }
     if (bytes_read < 0) {
       std::cerr << "[NETCP]: ERROR RECIBIENDO EL MENSAJE\n";
-      exit(3);
+      return std::make_error_code(std::errc(3));
     }
     message_text.resize(bytes_read);
     final_message += message_text;
   }
   std::cout << "[NETCP]: MENSAJE RECIBIDO CON ÉXITO\n";
   std::cout << "[NETCP]: TAMAÑO DEL MENSAJE: " << final_message.size() << " B\n";
-  return final_message;
+  message = final_message;
+  return std::make_error_code(std::errc(0));
 }
 
 /**

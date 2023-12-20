@@ -19,7 +19,7 @@
 
 extern std::atomic_bool quit_app;
 
-void Usage(int argc, char* argv[], int& mode);
+std::error_code Usage(int argc, char* argv[], int& mode, std::string& command, bool& cerrout, bool& cstdout);
 void SignalHandler(int signal);
 
 #endif // TOOLS_H_

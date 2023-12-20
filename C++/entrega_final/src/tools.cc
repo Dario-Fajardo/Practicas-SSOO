@@ -19,27 +19,42 @@
  * @param argv Argumentos
  * @param mode Variable tipo int donde se almacenará el modo de ejecución del programa (1 para escucha, 2 para envío, 3 para ayuda) 
  */
-void Usage(int argc, char* argv[], int& mode) {
+std::error_code Usage(int argc, char* argv[], int& mode, std::string& command, bool& cerrout, bool& cstdout) {
   mode = 2;
+  bool using_c{false};
   for (int i{0}; i < argc; i++) { // Procesar argumentos
     if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h") {
       mode = 3;
-    }
-    if (std::string(argv[i]) == "--listen" || std::string(argv[i]) == "-l") {
+      using_c = false;
+      break;
+    } else if ((std::string(argv[i]) == "--listen" || std::string(argv[i]) == "-l") && using_c == false) {
       mode = 1;
+      using_c = false;
+    } else if (std::string(argv[i]) == "-c" || std::string(argv[i]) == "--command") {
+      using_c = true;
+    } else {
+      if (using_c) {
+        command += argv[i];
+        command += " ";
+      }
+      if (std::string(argv[i]) == "-1") {
+        cstdout = true;
+      } else if (std::string(argv[i]) == "-2") {
+        cerrout = true;
+      }
     }
   }
   if (mode == 1) { // Comprobar argumentos para el modo escucha
-    if (argc != 3) {
+    if (argc != 3 && !using_c) {
       std::cerr << "Número de argumentos incorrecto para el modo escucha\n";
       std::cerr << "Uso: ./netcp [-h | --help] [--listen | -l] nombre_archivo\n";
-      exit(11);
+      return std::make_error_code(std::errc(11));
     }
   } else if (mode == 2) { // Comprobar argumentos para el modo enviar
-    if (argc != 2) {
+    if ((argc != 2)  && !using_c) {
       std::cerr << "Número de argumentos incorrecto para el modo enviar\n";
       std::cerr << "Uso: ./netcp nombre_archivo\n";
-      exit(12);
+      return std::make_error_code(std::errc(12));
     }
   }
   if (mode == 3) { // Mostrar ayuda
@@ -48,8 +63,8 @@ void Usage(int argc, char* argv[], int& mode) {
     std::cout << "se debe ejecutar el programa con la opción --listen o -l y el nombre del archivo en el que se guardará.\n";
     std::cout << "la información recibida.\n\n";
     std::cout << "Uso: ./netcp [-h | --help] [--listen | -l] nombre_archivo\n";
-    return;
   }
+  return std::make_error_code(std::errc(0));
 }
 
 /**
@@ -64,33 +79,33 @@ void SignalHandler(int signal) {
       message = "[NETCP]: SEÑAL SIGINT (";
       message += std::to_string(signal);
       message += ") RECIBIDA TERMINANDO...\n";
-      write(STDOUT_FILENO, message.data(), message.size());
+      write(STDERR_FILENO, message.data(), message.size());
       quit_app = true;
       break;
     case SIGTERM:
       message = "[NETCP]: SEÑAL SIGTERM (";
       message += std::to_string(signal);
       message += ") RECIBIDA TERMINANDO...\n";
-      write(STDOUT_FILENO, message.data(), message.size());
+      write(STDERR_FILENO, message.data(), message.size());
       quit_app = true;
       break;
     case SIGQUIT:
       message = "[NETCP]: SEÑAL SIGQUIT (";
       message += std::to_string(signal);
       message += ") RECIBIDA TERMINANDO...\n";
-      write(STDOUT_FILENO, message.data(), message.size());
+      write(STDERR_FILENO, message.data(), message.size());
       quit_app = true;
       break;
     case SIGHUP:
       message = "[NETCP]: SEÑAL SIGHUP (";
       message += std::to_string(signal);
       message += ") RECIBIDA TERMINANDO...\n";
-      write(STDOUT_FILENO, message.data(), message.size());
+      write(STDERR_FILENO, message.data(), message.size());
       quit_app = true;
       break;
     default:
       message = "[NETCP]: SEÑAL DESCONOCIDA RECIBIDA\n";
-      write(STDOUT_FILENO, message.data(), message.size());
+      write(STDERR_FILENO, message.data(), message.size());
       break;
   }
 }

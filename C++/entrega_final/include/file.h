@@ -32,6 +32,8 @@ class File {
   // Constructores
   File();
   File(const std::string& pathname = "", const int mode = 0, const std::string& ip_address = "127.0.0.1", const uint16_t port = 8080);
+  File(const int fd, const std::string& ip_address = "127.0.0.1", const uint16_t port = 8080);
+  File(const int fd, const std::optional<std::string>& message);
   // Destructor
   ~File();
   // Getters
@@ -41,7 +43,7 @@ class File {
   void PrintFile() const;
   int WriteFile(const std::vector<uint8_t>& data) const;
   int WriteFile(const std::string& data) const;
-  std::error_code read_file(int fd, std::vector<uint8_t>& buffer); 
+  std::error_code read_file(int fd, std::vector<uint8_t>& buffer);
  private:
   int fd_;
   std::vector<uint8_t> buffer_;
