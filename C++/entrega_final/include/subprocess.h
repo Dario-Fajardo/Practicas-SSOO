@@ -36,7 +36,7 @@ class SubProcess {
   bool IsAlive() const; // Comprueba si el subproceso está vivo
   std::error_code Exec(const std::string& message); 
   std::error_code Wait();
-  std::error_code Kill();
+  std::error_code Kill(const int signal);
  private:
   stdio redirect_io_;
   std::vector<std::string> args_;

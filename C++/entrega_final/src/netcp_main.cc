@@ -30,13 +30,13 @@ int main(int argc, char* argv[]) {
   bool cerrout{false};
   bool cstdout{false};
   std::error_code error{Usage(argc, argv, usage_mode, command, cerrout, cstdout)};
+  if (error.value() != 0) {
+    return error.value();
+  }
   std::vector<std::string> args{};
   while (command.find(" ") != std::string::npos) {
     args.push_back(command.substr(0, command.find(" ")));
     command = command.substr(command.find(" ") + 1);
-  }
-  if (error.value() != 0) {
-    return error.value();
   }
   if (!args.empty()) {  
     std::cout << "[NETCP]: COMANDO A EJECUTAR: " ;

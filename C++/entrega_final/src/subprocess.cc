@@ -121,7 +121,7 @@ std::error_code SubProcess::Wait() {
   int status;
   while (IsAlive()) {
     if (quit_app) {
-      Kill();
+      Kill(SIGTERM);
     }
     waitpid(GetPid(), &status, 0);
   }
@@ -133,8 +133,8 @@ std::error_code SubProcess::Wait() {
  * 
  * @return 0 si se ejecuta correctamente, cualquier otro valor en caso contrario
  */
-std::error_code SubProcess::Kill() {
-  int return_value = kill(GetPid(), SIGTERM);
+std::error_code SubProcess::Kill(const int signal) {
+  int return_value = kill(GetPid(), signal);
   if (return_value < 0) {
     std::cerr << "[NETCP]: ERROR AL MATAR AL SUBPROCESO" << strerror(errno) << std::endl;
     return std::error_code(errno, std::system_category());

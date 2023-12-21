@@ -47,22 +47,36 @@ std::error_code Usage(int argc, char* argv[], int& mode, std::string& command, b
   if (mode == 1) { // Comprobar argumentos para el modo escucha
     if (argc != 3 && !using_c) {
       std::cerr << "Número de argumentos incorrecto para el modo escucha\n";
-      std::cerr << "Uso: ./netcp [-h | --help] [--listen | -l] nombre_archivo\n";
+      std::cerr << "Uso: ./netcp [--listen | -l] ARCHIVO o ./netcp -l -c COMANDO [ARG...]\n";
+      std::cerr << "Utilice opción -h o --help para mostrar la ayuda\n";
       return std::make_error_code(std::errc(11));
     }
   } else if (mode == 2) { // Comprobar argumentos para el modo enviar
     if ((argc != 2)  && !using_c) {
       std::cerr << "Número de argumentos incorrecto para el modo enviar\n";
-      std::cerr << "Uso: ./netcp nombre_archivo\n";
+      std::cerr << "Uso: ./netcp ARCHIVO o ./netcp [-1] [-2] -c COMANDO [ARG...]\n";
+      std::cerr << "Utilice opción -h o --help para mostrar la ayuda\n";
       return std::make_error_code(std::errc(12));
     }
   }
   if (mode == 3) { // Mostrar ayuda
-    std::cout << "Este programa permite enviar la información de un archivo cualquiera desde una dirección ip pasada\n";
-    std::cout << "por variables de entorno por un puerto también pasado de este modo, para recibir dicha infomación \n";
-    std::cout << "se debe ejecutar el programa con la opción --listen o -l y el nombre del archivo en el que se guardará.\n";
-    std::cout << "la información recibida.\n\n";
-    std::cout << "Uso: ./netcp [-h | --help] [--listen | -l] nombre_archivo\n";
+    std::cout << "------------------------------------------------------------------------------------------\n";
+    std::cout << "FUNCIONAMIENTO:\n";
+    std::cout << "------------------------------------------------------------------------------------------\n";
+    std::cout << "Este programa tiene dos modos de funcionamiento, uno de envío de datos y otro de escucha de los mismos, en el primero de estos\n";
+    std::cout << "se envía un archivo a través de una conexión a un puerto determinado, mientras que en el segundo se escucha en un puertohasta recibir datos\n";
+    std::cout << "y se almacenan en un archivo.\n\n";
+    std::cout << "Otra manera de usar el programa es, en el envío, leer los datos de la entrada estándar (y/o error estándar) y enviarlos a través de la conexión\n";
+    std::cout << "y en el modo escucha, escribir los datos recibidos en la entrada estándar de otro comando.\n\n";
+    std::cout << "------------------------------------------------------------------------------------------\n";
+    std::cout << "MODOS DE USO:\n";
+    std::cout << "------------------------------------------------------------------------------------------\n";
+    std::cout << "\nnetcp -h | --help                                                   [MODO AYUDA DEL PROGRAMA]\n";
+    std::cout << "\nnetcp [-l | --listen] ARCHIVO                                       [MODO ESCUCHA]\n";
+    std::cout << "\nnetcp [-1] [-2] -c | --command COMANDO [ARGS...]                    [MODO ENVÍO DE COMANDO]\n";
+    std::cout << "\nnetcp [-1] [-2] ARCHIVO                                             [MODO ENVÍO DE ARCHIVO]\n";
+    std::cout << "\nnetcp -l -c | --command COMANDO [ARGS...]                           [MODO ESCUCHA DE COMANDO]\n\n";
+    std::cout << "▐▓█▀▀▀▀▀▀▀▀▀█▓▌░▄▄▄▄▄░\n▐▓█░░▀░░▀▄░░█▓▌░█▄▄▄█░\n▐▓█░░▄░░▄▀░░█▓▌░█▄▄▄█░\n▐▓█▄▄▄▄▄▄▄▄▄█▓▌░█████░\n░░░░▄▄███▄▄░░░░░█████░\n\n";
   }
   return std::make_error_code(std::errc(0));
 }
